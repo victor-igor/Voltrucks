@@ -37,13 +37,17 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
             {/* Header / Logo */}
             <div className="mb-10 flex flex-col items-center text-center">
-              <div className="flex flex-col items-center gap-5 mb-2 group">
-                <div className="w-20 h-20 bg-blue-600/20 rounded-2xl flex items-center justify-center border border-blue-500/30 shadow-[0_0_30px_rgba(59,130,246,0.3)] group-hover:scale-105 transition-transform duration-500">
-                  <Truck className="w-10 h-10 text-blue-500 drop-shadow-[0_0_10px_rgba(59,130,246,0.5)]" strokeWidth={1.5} />
+              <div className="flex flex-col items-center gap-3 mb-1 group">
+                <div className="w-20 h-20 flex items-center justify-center group-hover:scale-105 transition-transform duration-500">
+                  <img
+                    src="https://i.imgur.com/qmc8Yl5.png"
+                    alt="Voltrucks Logo"
+                    className="w-full h-full object-contain drop-shadow-[0_0_15px_rgba(59,130,246,0.3)]"
+                  />
                 </div>
                 <div className="flex flex-col items-center">
-                  <h1 className="text-4xl font-bold text-white leading-none tracking-tight">VOLTRUCKS</h1>
-                  <span className="text-sm text-blue-500 font-bold tracking-[0.4em] leading-none mt-2 uppercase pl-1">AI</span>
+                  <h1 className="text-2xl font-bold text-white leading-none tracking-tight">VOLTRUCKS</h1>
+                  <span className="text-xs text-blue-500 font-bold tracking-[0.3em] leading-none mt-1.5 uppercase pl-0.5">AI</span>
                 </div>
               </div>
               <p className="mt-4 text-base text-gray-400">
