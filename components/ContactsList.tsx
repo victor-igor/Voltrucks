@@ -12,6 +12,9 @@ export const ContactsList: React.FC<ContactsListProps> = ({ onEdit }) => {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   const { error: toastError } = useToast();
 
   useEffect(() => {
@@ -22,6 +25,10 @@ export const ContactsList: React.FC<ContactsListProps> = ({ onEdit }) => {
     try {
       setLoading(true);
       const data = await listContacts();
+      console.log('Contacts Data Loaded:', data); // Debug: Check if fields exist
+      if (data && data.length > 0) {
+        console.log('Sample Contact:', data[0]);
+      }
       setContacts(data);
     } catch (err: any) {
       console.error('Error loading contacts:', err);
@@ -32,16 +39,30 @@ export const ContactsList: React.FC<ContactsListProps> = ({ onEdit }) => {
     }
   };
 
+  // Filter contacts first
   const filteredContacts = contacts.filter(contact =>
     contact.nome_completo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contact.telefone.includes(searchTerm) ||
-    (contact.empresa?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+    (contact.telefone && contact.telefone.includes(searchTerm)) ||
+    (contact.empresa && contact.empresa.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
+  // Then paginate
+  const totalPages = Math.ceil(filteredContacts.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentContacts = filteredContacts.slice(startIndex, endIndex);
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+    }
+  };
+
   const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
+    switch (status?.toLowerCase()) {
       case 'cliente': return 'green';
       case 'negociação': return 'blue';
+      case 'novo': return 'blue';
       case 'lead': return 'yellow';
       case 'inativo': return 'gray';
       default: return 'gray';
@@ -69,7 +90,10 @@ export const ContactsList: React.FC<ContactsListProps> = ({ onEdit }) => {
           <input
             type="text"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1); // Reset to first page on search
+            }}
             className="block w-full pl-10 pr-3 py-2.5 border border-border-light dark:border-border-dark rounded-xl leading-5 bg-white dark:bg-input-dark text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:text-sm transition duration-150 ease-in-out shadow-sm"
             placeholder="Buscar por nome, empresa ou telefone..."
           />
@@ -118,17 +142,17 @@ export const ContactsList: React.FC<ContactsListProps> = ({ onEdit }) => {
                   </td>
                 </tr>
               ) : (
-                filteredContacts.map((person) => (
+                currentContacts.map((person) => (
                   <tr key={person.id} className="hover:bg-gray-50 dark:hover:bg-muted-dark/30 transition-colors">
                     <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{person.nome_completo}</td>
-                    <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{person.telefone}</td>
+                    <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{person.telefone || '-'}</td>
                     <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2">
                       <Building2 className="w-4 h-4 text-gray-400" />
                       {person.empresa || '-'}
                     </td>
                     <td className="px-6 py-3 whitespace-nowrap">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${getStatusStyle(getStatusColor(person.status))}`}>
-                        {person.status}
+                        {person.status || 'Novo'}
                       </span>
                     </td>
                     <td className="px-6 py-3 whitespace-nowrap text-right text-sm font-medium">
@@ -146,26 +170,71 @@ export const ContactsList: React.FC<ContactsListProps> = ({ onEdit }) => {
           </table>
         </div>
 
-        {/* Pagination (Static for now) */}
+        {/* Pagination */}
         <div className="flex flex-col sm:flex-row items-center justify-between border-t border-border-light dark:border-border-dark bg-white dark:bg-card-dark px-4 py-3 sm:px-6 gap-3">
           <div className="w-full sm:hidden flex justify-between gap-2">
-            <button className="relative inline-flex items-center justify-center flex-1 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Anterior</button>
-            <button className="relative inline-flex items-center justify-center flex-1 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Próximo</button>
+            <button
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="relative inline-flex items-center justify-center flex-1 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Anterior
+            </button>
+            <button
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="relative inline-flex items-center justify-center flex-1 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Próximo
+            </button>
           </div>
           <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
             <div>
               <p className="text-sm text-gray-700 dark:text-gray-400">
-                Mostrando <span className="font-medium">{filteredContacts.length > 0 ? 1 : 0}</span> a <span className="font-medium">{filteredContacts.length}</span> de <span className="font-medium">{filteredContacts.length}</span> resultados
+                Mostrando <span className="font-medium">{filteredContacts.length > 0 ? startIndex + 1 : 0}</span> a <span className="font-medium">{Math.min(endIndex, filteredContacts.length)}</span> de <span className="font-medium">{filteredContacts.length}</span> resultados
               </p>
             </div>
             <div>
               <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
-                <button className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-border-light dark:ring-border-dark hover:bg-gray-50 dark:hover:bg-muted-dark focus:z-20 focus:outline-offset-0">
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-border-light dark:ring-border-dark hover:bg-gray-50 dark:hover:bg-muted-dark focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                   <span className="sr-only">Previous</span>
                   <ChevronLeft className="h-4 w-4" aria-hidden="true" />
                 </button>
-                <button aria-current="page" className="relative z-10 inline-flex items-center bg-primary px-4 py-2 text-sm font-semibold text-white focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">1</button>
-                <button className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-border-light dark:ring-border-dark hover:bg-gray-50 dark:hover:bg-muted-dark focus:z-20 focus:outline-offset-0">
+
+                {/* Dynamically render page numbers could be better, but user asked for simple pagination for now */}
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  // Simple logic to show a window of pages around current, or just first 5 for simplicity if total is huge
+                  // Integrating a simple sliding window would be better
+                  let p = i + 1;
+                  if (totalPages > 5 && currentPage > 3) {
+                    p = currentPage - 2 + i;
+                  }
+                  if (p > totalPages) return null;
+
+                  return (
+                    <button
+                      key={p}
+                      onClick={() => handlePageChange(p)}
+                      aria-current={currentPage === p ? 'page' : undefined}
+                      className={`relative z-10 inline-flex items-center px-4 py-2 text-sm font-semibold focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${currentPage === p
+                          ? 'bg-primary text-white focus-visible:outline-primary'
+                          : 'text-gray-900 ring-1 ring-inset ring-border-light hover:bg-gray-50 dark:text-white dark:hover:bg-muted-dark'
+                        }`}
+                    >
+                      {p}
+                    </button>
+                  );
+                })}
+
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-border-light dark:ring-border-dark hover:bg-gray-50 dark:hover:bg-muted-dark focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                   <span className="sr-only">Next</span>
                   <ChevronRight className="h-4 w-4" aria-hidden="true" />
                 </button>

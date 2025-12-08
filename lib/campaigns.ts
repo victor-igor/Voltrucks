@@ -13,7 +13,7 @@ export interface AudienceFilter {
     value?: string; // Tag name or CSV file URL
 }
 
-export type MessageType = 'text' | 'image' | 'video';
+export type MessageType = 'text' | 'image' | 'video' | 'template';
 
 export interface Campaign {
     id: string;
@@ -22,14 +22,58 @@ export interface Campaign {
     status: CampaignStatus;
     schedule_time?: string;
     recurrence_rule?: RecurrenceRule;
-    audience_filter: AudienceFilter;
+    audience_filter: any;
     created_at: string;
     last_run_at?: string;
-    created_by?: string;
-    message_type: MessageType;
+    created_by: string;
+    message_type: MessageType; // Currently unused in favor of template structure but kept for compat
     media_url?: string;
     daily_limit?: number;
-    message_variations?: string[];
+    message_variations: string[]; // Still used for internal storage, but will store template name/body
+    template_name?: string; // New field for reference
+    template_language?: string; // New field for reference
+}
+
+export interface WhatsAppTemplate {
+    name: string;
+    status: string;
+    language: string;
+    components: {
+        type: 'HEADER' | 'BODY' | 'FOOTER' | 'BUTTONS';
+        format?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'DOCUMENT';
+        text?: string;
+        buttons?: any[];
+        example?: any;
+    }[];
+}
+
+// WARNING: TOKENS SHOULD BE IN ENVIRONMENT VARIABLES
+const META_ACCESS_TOKEN = 'EAAKmFZBwTLboBQGC0pf8fY2DaDXNTZCrPovqtM3oL9kLqG1jv5C9XZCpvLp1jbQMGsI9JW0Pdx5Sl2Alugiwwio27pTnGC ZBTmgOZB9Uc059XrJ9OQzVYzZCAhrhpTen3Wy6cnEZCN3ny5wXAcwgLDaTg5Y3yhSlIAVa7AP0KQoYml0n1T8EUoFUJF0fk2U2bPZCUwZDZD';
+const META_ACCOUNT_ID = '1519441755961650';
+
+export async function listMessageTemplates(): Promise<WhatsAppTemplate[]> {
+    try {
+        const response = await fetch(
+            `https://graph.facebook.com/v21.0/${META_ACCOUNT_ID}/message_templates?fields=name,status,language,components&limit=50`,
+            {
+                headers: {
+                    'Authorization': `Bearer ${META_ACCESS_TOKEN}`
+                }
+            }
+        );
+
+        if (!response.ok) {
+            const error = await response.json();
+            console.error('Meta API Error:', error);
+            throw new Error(error.error?.message || 'Failed to fetch templates');
+        }
+
+        const data = await response.json();
+        return data.data.filter((t: any) => t.status === 'APPROVED');
+    } catch (error) {
+        console.error('Error listing templates:', error);
+        throw error;
+    }
 }
 
 export async function createCampaign(campaign: Omit<Campaign, 'id' | 'created_at' | 'status' | 'created_by'>) {
@@ -50,6 +94,8 @@ export async function createCampaign(campaign: Omit<Campaign, 'id' | 'created_at
                 media_url: campaign.media_url,
                 daily_limit: campaign.daily_limit,
                 message_variations: campaign.message_variations,
+                template_name: campaign.template_name,
+                template_language: campaign.template_language,
                 status: 'pending', // Default status for new campaigns
                 created_by: user.id
             }
@@ -309,5 +355,3 @@ export async function getCampaignTargetAudience(campaignId: string, limit?: numb
 
     return contacts;
 }
-
-

@@ -46,8 +46,8 @@ export const whatsappService = {
                 throw new Error('Erro ao verificar limite de instâncias');
             }
 
-            if (count !== null && count >= 5) {
-                throw new Error('Limite máximo de 5 instâncias atingido. Exclua uma para criar nova.');
+            if (count !== null && count >= 0) {
+                throw new Error('Seu plano atual não permite criar instâncias do WhatsApp. Entre em contato para fazer o upgrade.');
             }
 
             console.log('Iniciando criação de instância na Uazapi:', name);

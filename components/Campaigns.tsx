@@ -17,6 +17,7 @@ import {
     ArrowLeft,
     MoreVertical,
     Trash2,
+    Edit2,
     Copy,
     Calendar as CalendarIcon,
     XCircle,
@@ -33,9 +34,11 @@ import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     BarChart, Bar, Cell, PieChart, Pie, Legend
 } from 'recharts';
-import { createCampaign, listCampaigns, deleteCampaign, getCampaignStats, Campaign, CampaignType, RecurrenceRule, MessageType } from '../lib/campaigns';
+import { createCampaign, updateCampaign, updateCampaignStatus, listCampaigns, deleteCampaign, getCampaignStats, listMessageTemplates, Campaign, CampaignType, RecurrenceRule, MessageType, WhatsAppTemplate } from '../lib/campaigns';
+import { getTags, Tag } from '../lib/contacts';
 import { useToast } from '../contexts/ToastContext';
 import { supabase } from '../lib/supabase';
+import { DeleteConfirmationModal } from './DeleteConfirmationModal';
 
 type ViewMode = 'list' | 'create' | 'report';
 type TimeRange = 'today' | '7days' | '30days' | 'custom';
@@ -55,10 +58,31 @@ export const Campaigns: React.FC = () => {
     // --- Form State ---
     const [campaignName, setCampaignName] = useState('');
     const [audience, setAudience] = useState('all');
-    const [messageType, setMessageType] = useState<MessageType>('text');
-    const [messageText, setMessageText] = useState('');
+
+    // Template State
+    const [templates, setTemplates] = useState<WhatsAppTemplate[]>([]);
+    const [selectedTemplate, setSelectedTemplate] = useState<WhatsAppTemplate | null>(null);
+    const [loadingTemplates, setLoadingTemplates] = useState(false);
+
+    // Audience Tags
+    const [availableTags, setAvailableTags] = useState<Tag[]>([]);
+
+    // Submission State
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Delete Modal State
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [campaignToDelete, setCampaignToDelete] = useState<string | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+
+
+    // Legacy State (mostly unused now but kept for type compatibility or fallbacks if needed)
+    const [messageType, setMessageType] = useState<MessageType>('template');
+    const [messageText, setMessageText] = useState(''); // Will store template body text for preview
     const [messageVariations, setMessageVariations] = useState<string[]>([]);
     const [file, setFile] = useState<File | null>(null);
+
     const [campaignType, setCampaignType] = useState<CampaignType>('instant');
     const [scheduleTime, setScheduleTime] = useState('');
     const [recurrenceDays, setRecurrenceDays] = useState<number[]>([]);
@@ -133,97 +157,181 @@ export const Campaigns: React.FC = () => {
         setMessageVariations(newVariations);
     };
 
-    const handleCreateCampaign = async () => {
+    useEffect(() => {
+        if (viewMode === 'create') {
+            fetchTemplates();
+        }
+    }, [viewMode]);
+
+    const fetchTemplates = async () => {
         try {
-            if (!campaignName || !messageText) {
-                toastError('Preencha todos os campos obrigatórios');
-                return;
-            }
-
-            if (campaignType === 'scheduled' && !scheduleTime) {
-                toastError('Selecione a data e hora do agendamento');
-                return;
-            }
-
-            if (campaignType === 'recurring' && (recurrenceDays.length === 0 || recurrenceTimes.length === 0)) {
-                toastError('Configure a recorrência corretamente');
-                return;
-            }
-
-            if (messageType !== 'text' && !file) {
-                toastError('Selecione um arquivo de mídia');
-                return;
-            }
-
-            let mediaUrl = undefined;
-            if (file) {
-                const fileExt = file.name.split('.').pop();
-                const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
-                const filePath = `${fileName}`;
-
-                const { error: uploadError } = await supabase.storage
-                    .from('campaign-media')
-                    .upload(filePath, file);
-
-                if (uploadError) {
-                    throw uploadError;
-                }
-
-                const { data: { publicUrl } } = supabase.storage
-                    .from('campaign-media')
-                    .getPublicUrl(filePath);
-
-                mediaUrl = publicUrl;
-            }
-
-            const recurrenceRule: RecurrenceRule | undefined = campaignType === 'recurring'
-                ? { days: recurrenceDays, times: recurrenceTimes }
-                : undefined;
-
-            // Combine main message and variations into a single array for the 'message_variations' column
-            // This ensures all potential messages are in one place for n8n to pick from.
-            const allVariations = [messageText, ...messageVariations].filter(v => v.trim() !== '');
-
-            await createCampaign({
-                name: campaignName,
-                type: campaignType,
-                schedule_time: campaignType === 'scheduled' ? new Date(scheduleTime).toISOString() : undefined,
-                recurrence_rule: recurrenceRule,
-                audience_filter: { type: 'all' }, // Simplified for now
-                message_type: messageType,
-                media_url: mediaUrl,
-                daily_limit: dailyLimit ? Number(dailyLimit) : undefined,
-                message_variations: allVariations // Store ALL variations here
-            });
-
-            success('Campanha criada com sucesso!');
-            setViewMode('list');
-            loadCampaigns();
-
-            // Reset form
-            setCampaignName('');
-            setMessageText('');
-            setMessageVariations([]);
-            setCampaignType('instant');
-            setScheduleTime('');
-            setRecurrenceDays([]);
-            setMessageType('text');
-            setFile(null);
-            setDailyLimit('');
-        } catch (err: any) {
-            console.error('Error creating campaign:', err);
-            toastError('Erro ao criar campanha: ' + err.message);
+            setLoadingTemplates(true);
+            const data = await listMessageTemplates();
+            setTemplates(data);
+        } catch (error) {
+            console.error('Error fetching templates:', error);
+            toastError('Erro ao carregar templates do WhatsApp');
+        } finally {
+            setLoadingTemplates(false);
         }
     };
 
-    const handleDeleteCampaign = async (id: string) => {
-        if (!confirm('Tem certeza que deseja excluir esta campanha?')) return;
+    const loadTags = async () => {
         try {
-            await deleteCampaign(id);
+            const tags = await getTags();
+            setAvailableTags(tags);
+        } catch (error) {
+            console.error('Error loading tags:', error);
+        }
+    };
+
+    useEffect(() => {
+        loadTags();
+    }, []);
+
+    const handleTemplateSelect = (templateName: string) => {
+        const template = templates.find(t => t.name === templateName);
+        setSelectedTemplate(template || null);
+
+        // Extract body text for simple preview/storage
+        if (template) {
+            const bodyComponent = template.components.find(c => c.type === 'BODY');
+            setMessageText(bodyComponent?.text || '');
+        } else {
+            setMessageText('');
+        }
+    };
+
+    const handleEditClick = (campaign: Campaign) => {
+        setSelectedCampaignId(campaign.id);
+        setCampaignName(campaign.name);
+        setCampaignType(campaign.type);
+        setScheduleTime(campaign.schedule_time || '');
+        if (campaign.recurrence_rule) {
+            setRecurrenceDays(campaign.recurrence_rule.days);
+            setRecurrenceTimes(campaign.recurrence_rule.times);
+        }
+
+        if (campaign.audience_filter) {
+            if (campaign.audience_filter.type === 'tag' && campaign.audience_filter.value) {
+                setAudience(campaign.audience_filter.value);
+            } else {
+                setAudience(campaign.audience_filter.type);
+            }
+        }
+
+        if (campaign.template_name) {
+            const tmpl = templates.find(t => t.name === campaign.template_name && t.language === campaign.template_language);
+            if (tmpl) setSelectedTemplate(tmpl);
+        }
+
+        setDailyLimit(campaign.daily_limit);
+        setViewMode('create');
+    };
+
+    const resetForm = () => {
+        setCampaignName('');
+        setCampaignType('instant');
+        setAudience('all');
+        setScheduleTime('');
+        setRecurrenceDays([]);
+        setRecurrenceTimes(['09:00']);
+        setSelectedTemplate(null);
+        setDailyLimit(undefined);
+        setSelectedCampaignId(null);
+    };
+
+    const handleCreateCampaign = async () => {
+        if (isSubmitting) return;
+
+        if (!campaignName) {
+            toastError('Nome da campanha é obrigatório');
+            return;
+        }
+        if (!selectedTemplate) {
+            toastError('Selecione um template');
+            return;
+        }
+
+        if (campaignType === 'scheduled' && !scheduleTime) {
+            toastError('Selecione a data e hora do agendamento');
+            return;
+        }
+
+        if (campaignType === 'recurring' && (recurrenceDays.length === 0 || recurrenceTimes.length === 0)) {
+            toastError('Configure a recorrência corretamente');
+            return;
+        }
+
+        setIsSubmitting(true);
+
+        const recurrenceRule: RecurrenceRule | undefined = campaignType === 'recurring'
+            ? { days: recurrenceDays, times: recurrenceTimes }
+            : undefined;
+
+        const audienceFilter = {
+            type: audience === 'all' ? 'all' : 'tag',
+            value: audience === 'all' ? undefined : audience
+        };
+
+        const templateData = {
+            template_name: selectedTemplate.name,
+            template_language: selectedTemplate.language
+        };
+
+        const campaignData = {
+            name: campaignName,
+            type: campaignType,
+            schedule_time: campaignType === 'scheduled' ? new Date(scheduleTime).toISOString() : undefined,
+            recurrence_rule: recurrenceRule,
+            audience_filter: audienceFilter,
+            message_type: 'template' as MessageType,
+            media_url: undefined,
+            daily_limit: dailyLimit ? Number(dailyLimit) : undefined,
+            message_variations: [selectedTemplate.name],
+            ...templateData,
+        };
+
+        try {
+            if (selectedCampaignId) {
+                await updateCampaign(selectedCampaignId, campaignData);
+                success('Campanha atualizada com sucesso!');
+            } else {
+                await createCampaign(campaignData);
+                success('Campanha criada com sucesso!');
+            }
+
+            loadCampaigns();
+            setViewMode('list');
+            resetForm();
+        } catch (err: any) {
+            console.error('Error creating campaign:', err);
+            toastError('Erro ao salvar campanha: ' + (err.message || 'Erro desconhecido'));
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleDeleteClick = (id: string) => {
+        setCampaignToDelete(id);
+        setDeleteModalOpen(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!campaignToDelete) return;
+
+        try {
+            setIsDeleting(true);
+            await deleteCampaign(campaignToDelete);
             success('Campanha excluída com sucesso!');
             loadCampaigns();
+            setDeleteModalOpen(false);
+            setCampaignToDelete(null);
         } catch (err: any) {
+            console.error('Error deleting campaign:', err);
             toastError('Erro ao excluir campanha');
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -231,6 +339,23 @@ export const Campaigns: React.FC = () => {
         setRecurrenceDays(prev =>
             prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
         );
+    };
+
+    const handleToggleStatus = async (id: string, currentStatus: string) => {
+        try {
+            const newStatus = currentStatus === 'active' ? 'paused' : 'active';
+            // Optimistic update
+            setCampaigns(prev => prev.map(c =>
+                c.id === id ? { ...c, status: newStatus } : c
+            ));
+
+            await updateCampaignStatus(id, newStatus);
+            success(`Campanha ${newStatus === 'active' ? 'ativada' : 'pausada'} com sucesso!`);
+        } catch (err) {
+            console.error('Error toggling status:', err);
+            toastError('Erro ao alterar status da campanha');
+            loadCampaigns(); // Revert on error
+        }
     };
 
     // --- Filter Logic ---
@@ -308,7 +433,15 @@ export const Campaigns: React.FC = () => {
         setFile(null);
     };
     // ... (inside render report view)
-    if (viewMode === 'report' && stats) {
+    if (viewMode === 'report') {
+        if (loading || !stats) {
+            return (
+                <div className="animate-in fade-in duration-300 p-6 flex flex-col items-center justify-center min-h-[400px]">
+                    <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
+                    <p className="text-gray-500 dark:text-gray-400">Carregando estatísticas...</p>
+                </div>
+            );
+        }
         return (
             <div className="animate-in fade-in slide-in-from-right-4 duration-500 p-6 space-y-8">
                 <div className="flex items-center justify-between">
@@ -529,13 +662,9 @@ export const Campaigns: React.FC = () => {
         return (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
                 {/* Header & Filters */}
-                <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
-                    <div>
-                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Gerenciador de Campanhas</h2>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Acompanhe o desempenho dos seus disparos em massa.</p>
-                    </div>
+                <div className="flex justify-end">
 
-                    <div className="flex flex-col sm:flex-row gap-4 w-full xl:w-auto items-center">
+                    <div className="flex flex-col sm:flex-row gap-4 items-center">
                         {/* Time Filter */}
                         <div className="flex items-center bg-white dark:bg-card-dark p-1 rounded-lg border border-border-light dark:border-border-dark shadow-sm w-full sm:w-auto overflow-x-auto">
                             <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 px-2 whitespace-nowrap flex items-center gap-1">
@@ -548,7 +677,7 @@ export const Campaigns: React.FC = () => {
                         </div>
 
                         <button
-                            onClick={() => setViewMode('create')}
+                            onClick={() => { setViewMode('create'); resetForm(); }}
                             className="w-full sm:w-auto flex items-center justify-center gap-2 bg-primary text-black px-5 py-2 rounded-xl font-bold hover:bg-primary/90 transition-all shadow-[0_0_15px_rgba(0,255,255,0.3)] whitespace-nowrap"
                         >
                             <Plus className="w-5 h-5" />
@@ -578,10 +707,26 @@ export const Campaigns: React.FC = () => {
                                         <div>
                                             <h3 className="text-lg font-bold text-gray-900 dark:text-white">{camp.name}</h3>
                                             <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mt-1">
-                                                <Clock className="w-3.5 h-3.5" />
-                                                <span>{new Date(camp.created_at).toLocaleDateString()}</span>
-                                                <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
-                                                <span className="capitalize">{camp.type === 'instant' ? 'Instantâneo' : camp.type === 'scheduled' ? 'Agendado' : 'Recorrente'}</span>
+                                                {camp.type === 'recurring' && camp.recurrence_rule ? (
+                                                    <>
+                                                        <Repeat className="w-3.5 h-3.5" />
+                                                        <span>
+                                                            {camp.recurrence_rule.days
+                                                                .sort()
+                                                                .map(d => ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][d])
+                                                                .join(', ')}
+                                                        </span>
+                                                        <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
+                                                        <span>{camp.recurrence_rule.times.join(', ')}</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Clock className="w-3.5 h-3.5" />
+                                                        <span>{new Date(camp.created_at).toLocaleDateString()}</span>
+                                                        <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
+                                                        <span className="capitalize">{camp.type === 'instant' ? 'Instantâneo' : 'Agendado'}</span>
+                                                    </>
+                                                )}
                                                 {camp.daily_limit && (
                                                     <>
                                                         <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
@@ -595,16 +740,44 @@ export const Campaigns: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    <div className="flex items-center gap-3">
-                                        <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide border
-                                    ${camp.status === 'completed' ? 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900/30' :
-                                                camp.status === 'active' ? 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-900/30 animate-pulse' :
-                                                    'bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-900/30'}
-                                `}>
-                                            {camp.status}
-                                        </span>
+                                    {/* Status & Actions */}
+                                    <div className="flex items-center gap-4">
+                                        {/* Status Badge or Toggle */}
+                                        {camp.type === 'recurring' ? (
+                                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+                                                <span className={`text-xs font-bold uppercase tracking-wide ${camp.status === 'active' ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                                                    {camp.status === 'active' ? 'Ativa' : 'Pausada'}
+                                                </span>
+                                                <button
+                                                    onClick={() => handleToggleStatus(camp.id, camp.status)}
+                                                    className={`relative w-10 h-5 rounded-full transition-all duration-300 ease-in-out focus:outline-none ${camp.status === 'active'
+                                                        ? 'bg-gradient-to-r from-green-400 to-green-500'
+                                                        : 'bg-gray-300 dark:bg-gray-600'
+                                                        }`}
+                                                    title={camp.status === 'active' ? 'Pausar Campanha' : 'Ativar Campanha'}
+                                                >
+                                                    <div
+                                                        className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-300 ease-in-out ${camp.status === 'active' ? 'translate-x-5' : 'translate-x-0'
+                                                            }`}
+                                                    />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <span className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide border
+                                                ${camp.status === 'completed' ? 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900/30' :
+                                                    camp.status === 'processing' || camp.status === 'active' ? 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-900/30' :
+                                                        camp.status === 'failed' ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900/30' :
+                                                            'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'}`}>
+                                                {camp.status === 'pending' ? 'Pendente' :
+                                                    camp.status === 'processing' ? 'Enviando' :
+                                                        camp.status === 'completed' ? 'Concluída' :
+                                                            camp.status === 'failed' ? 'Falhou' :
+                                                                camp.status === 'cancelled' ? 'Cancelada' : camp.status}
+                                            </span>
+                                        )}
 
-                                        <div className="flex items-center border-l border-border-light dark:border-border-dark pl-3 ml-2 gap-1">
+                                        {/* Action Buttons */}
+                                        <div className="flex items-center border-l border-border-light dark:border-border-dark pl-4 gap-1">
                                             <button
                                                 onClick={() => handleViewReport(camp.id)}
                                                 className="p-2 text-gray-400 hover:text-primary transition-colors"
@@ -613,7 +786,14 @@ export const Campaigns: React.FC = () => {
                                                 <BarChart2 className="w-4 h-4" />
                                             </button>
                                             <button
-                                                onClick={() => handleDeleteCampaign(camp.id)}
+                                                onClick={() => handleEditClick(camp)}
+                                                className="p-2 text-gray-400 hover:text-blue-500 transition-colors"
+                                                title="Editar"
+                                            >
+                                                <Edit2 className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteClick(camp.id)}
                                                 className="p-2 text-gray-400 hover:text-red-500 transition-colors"
                                                 title="Excluir"
                                             >
@@ -625,7 +805,16 @@ export const Campaigns: React.FC = () => {
                             </div>
                         )))}
                 </div>
-            </div>
+                {/* Modal de Confirmação de Exclusão */}
+                <DeleteConfirmationModal
+                    isOpen={deleteModalOpen}
+                    onClose={() => setDeleteModalOpen(false)}
+                    onConfirm={confirmDelete}
+                    title="Excluir Campanha"
+                    message="Tem certeza que deseja excluir esta campanha? Esta ação não pode ser desfeita e todos os dados relacionados serão perdidos."
+                    isDeleting={isDeleting}
+                />
+            </div >
         );
     }
 
@@ -633,14 +822,23 @@ export const Campaigns: React.FC = () => {
     return (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
 
-            <div className="flex items-center gap-4 mb-6">
-                <button
-                    onClick={() => setViewMode('list')}
-                    className="p-2 rounded-lg bg-white dark:bg-card-dark border border-border-light dark:border-border-dark hover:bg-gray-50 dark:hover:bg-muted-dark transition-colors"
-                >
-                    <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                </button>
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Criar Nova Campanha</h2>
+            <div className="flex justify-between items-center mb-8">
+                <div className="flex items-center gap-4">
+                    <button
+                        onClick={() => { setViewMode('list'); resetForm(); }}
+                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+                    >
+                        <ArrowLeft className="w-6 h-6 text-gray-600 dark:text-gray-300" />
+                    </button>
+                    <div>
+                        <h2 className="text-2xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
+                            {selectedCampaignId ? 'Editar Campanha' : 'Nova Campanha'}
+                        </h2>
+                        <p className="text-gray-500 dark:text-gray-400">
+                            {selectedCampaignId ? 'Atualize os detalhes da sua campanha' : 'Configure os detalhes do seu novo disparo'}
+                        </p>
+                    </div>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
@@ -677,140 +875,56 @@ export const Campaigns: React.FC = () => {
                                         className="w-full pl-10 bg-gray-50 dark:bg-input-dark border border-border-light dark:border-border-dark rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary outline-none appearance-none"
                                     >
                                         <option value="all">Todos os Contatos</option>
-                                        <option value="leads">Tag: Leads Quentes</option>
-                                        <option value="clients">Tag: Clientes Ativos</option>
+                                        {availableTags.map(tag => (
+                                            <option key={tag.id} value={tag.id}>Tag: {tag.name}</option>
+                                        ))}
                                     </select>
                                 </div>
                             </div>
                         </div>
                     </section>
 
-                    {/* 2. Content Composer */}
+                    {/* 2. Content Composer (Templates) */}
                     <section className="bg-white dark:bg-card-dark rounded-xl p-6 border border-border-light dark:border-border-dark shadow-sm">
                         <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
                             <div className="w-6 h-6 rounded-full bg-primary text-black flex items-center justify-center text-xs font-bold">2</div>
-                            Conteúdo da Mensagem
+                            Conteúdo da Mensagem (Oficial Meta)
                         </h2>
-
-                        {/* Type Selector */}
-                        <div className="flex gap-4 mb-6 border-b border-border-light dark:border-border-dark pb-6">
-                            <button
-                                onClick={() => handleChangeMessageType('text')}
-                                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg border transition-all font-bold text-sm
-                        ${messageType === 'text'
-                                        ? 'bg-primary/10 border-primary text-primary'
-                                        : 'bg-gray-50 dark:bg-muted-dark border-transparent text-gray-500 hover:bg-gray-100 dark:hover:bg-input-dark'
-                                    }`}
-                            >
-                                <Type className="w-4 h-4" />
-                                Apenas Texto
-                            </button>
-                            <button
-                                onClick={() => handleChangeMessageType('image')}
-                                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg border transition-all font-bold text-sm
-                        ${messageType === 'image'
-                                        ? 'bg-primary/10 border-primary text-primary'
-                                        : 'bg-gray-50 dark:bg-muted-dark border-transparent text-gray-500 hover:bg-gray-100 dark:hover:bg-input-dark'
-                                    }`}
-                            >
-                                <ImageIcon className="w-4 h-4" />
-                                Imagem + Texto
-                            </button>
-                            <button
-                                onClick={() => handleChangeMessageType('video')}
-                                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg border transition-all font-bold text-sm
-                        ${messageType === 'video'
-                                        ? 'bg-primary/10 border-primary text-primary'
-                                        : 'bg-gray-50 dark:bg-muted-dark border-transparent text-gray-500 hover:bg-gray-100 dark:hover:bg-input-dark'
-                                    }`}
-                            >
-                                <Video className="w-4 h-4" />
-                                Vídeo + Texto
-                            </button>
-                        </div>
 
                         <div className="space-y-4">
                             <div>
-                                <div className="flex justify-between items-center mb-2">
-                                    <label className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Mensagem Principal (Variação A)</label>
-                                    <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Padrão</span>
-                                </div>
-                                <textarea
-                                    value={messageText}
-                                    onChange={(e) => setMessageText(e.target.value)}
-                                    className="w-full h-32 bg-gray-50 dark:bg-input-dark border border-border-light dark:border-border-dark rounded-lg p-4 text-sm focus:ring-2 focus:ring-primary outline-none resize-none"
-                                    placeholder="Digite sua mensagem aqui..."
-                                />
+                                <label className="block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2">Selecione um Template Aprovado</label>
+                                {loadingTemplates ? (
+                                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                                        <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                                        Carregando templates...
+                                    </div>
+                                ) : (
+                                    <select
+                                        value={selectedTemplate?.name || ''}
+                                        onChange={(e) => handleTemplateSelect(e.target.value)}
+                                        className="w-full bg-gray-50 dark:bg-input-dark border border-border-light dark:border-border-dark rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary outline-none"
+                                    >
+                                        <option value="">Selecione um template...</option>
+                                        {templates.map((t) => (
+                                            <option key={t.name} value={t.name}>
+                                                {t.name} ({t.language}) - {t.status}
+                                            </option>
+                                        ))}
+                                    </select>
+                                )}
                             </div>
 
-                            {/* Variations List */}
-                            {messageVariations.map((variation, index) => (
-                                <div key={index} className="animate-in fade-in slide-in-from-top-2">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <label className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Variação {String.fromCharCode(66 + index)}</label>
-                                        <button onClick={() => handleRemoveVariation(index)} className="text-red-500 hover:text-red-700 text-xs flex items-center gap-1">
-                                            <Trash2 className="w-3 h-3" /> Remover
-                                        </button>
+                            {selectedTemplate && (
+                                <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-900/30">
+                                    <h4 className="text-sm font-bold text-blue-800 dark:text-blue-300 mb-2 flex items-center gap-2">
+                                        <CheckCircle2 className="w-4 h-4" /> Template Selecionado
+                                    </h4>
+                                    <div className="text-xs text-blue-600 dark:text-blue-400 space-y-2">
+                                        <p><strong>Nome:</strong> {selectedTemplate.name}</p>
+                                        <p><strong>Língua:</strong> {selectedTemplate.language}</p>
+                                        <p><strong>Componentes:</strong> {selectedTemplate.components.map(c => c.type).join(', ')}</p>
                                     </div>
-                                    <textarea
-                                        value={variation}
-                                        onChange={(e) => handleVariationChange(index, e.target.value)}
-                                        className="w-full h-32 bg-gray-50 dark:bg-input-dark border border-border-light dark:border-border-dark rounded-lg p-4 text-sm focus:ring-2 focus:ring-primary outline-none resize-none"
-                                        placeholder={`Digite a variação ${String.fromCharCode(66 + index)} da mensagem...`}
-                                    />
-                                </div>
-                            ))}
-
-                            <button
-                                onClick={handleAddVariation}
-                                className="flex items-center gap-2 text-sm font-bold text-primary hover:text-primary/80 transition-colors"
-                            >
-                                <Plus className="w-4 h-4" />
-                                Adicionar Variação de Texto
-                            </button>
-
-                            {messageType !== 'text' && (
-                                <div
-                                    className="border-2 border-dashed border-border-light dark:border-border-dark rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer hover:border-primary/50 transition-colors mt-4"
-                                    onDragOver={(e) => e.preventDefault()}
-                                    onDrop={handleFileDrop}
-                                    onClick={triggerFileInput}
-                                >
-                                    <input
-                                        type="file"
-                                        ref={fileInputRef}
-                                        className="hidden"
-                                        accept={messageType === 'image' ? 'image/*' : 'video/*'}
-                                        onChange={handleFileSelect}
-                                    />
-                                    {file ? (
-                                        <div className="relative group">
-                                            {messageType === 'image' ? (
-                                                <img src={URL.createObjectURL(file)} alt="Preview" className="h-32 rounded-lg object-cover" />
-                                            ) : (
-                                                <video src={URL.createObjectURL(file)} className="h-32 rounded-lg" controls />
-                                            )}
-                                            <button
-                                                onClick={clearFile}
-                                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
-                                            >
-                                                <X className="w-4 h-4" />
-                                            </button>
-                                            <p className="text-xs text-center mt-2 text-gray-500">{file.name}</p>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <div className="w-12 h-12 bg-gray-100 dark:bg-muted-dark rounded-full flex items-center justify-center mb-3 text-gray-400">
-                                                <UploadCloud className="w-6 h-6" />
-                                            </div>
-                                            <p className="text-sm font-medium text-gray-900 dark:text-white">
-                                                Clique para fazer upload ou arraste o arquivo
-                                            </p>
-                                            <p className="text-xs text-gray-500 mt-1">
-                                                {messageType === 'image' ? 'PNG, JPG ou GIF até 5MB' : 'MP4 até 10MB'}
-                                            </p>
-                                        </>
-                                    )}
                                 </div>
                             )}
                         </div>
@@ -996,9 +1110,13 @@ export const Campaigns: React.FC = () => {
                                             </div>
                                         )}
 
-                                        {/* Text Message */}
+                                        {/* Text Message (Template Body) */}
                                         <p className="text-sm text-gray-900 dark:text-white whitespace-pre-wrap leading-relaxed">
-                                            {previewIndex === 0 ? (messageText || 'Sua mensagem aparecerá aqui...') : (messageVariations[previewIndex - 1] || 'Variação vazia...')}
+                                            {selectedTemplate ? (
+                                                selectedTemplate.components.find(c => c.type === 'BODY')?.text || 'Este template não possui texto de corpo.'
+                                            ) : (
+                                                'Selecione um template para visualizar...'
+                                            )}
                                         </p>
 
                                         {/* Timestamp & Check */}
@@ -1034,15 +1152,35 @@ export const Campaigns: React.FC = () => {
                             </div>
                             <button
                                 onClick={handleCreateCampaign}
-                                className="w-full mt-6 bg-primary text-black py-3 rounded-lg font-bold hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
+                                disabled={isSubmitting}
+                                className={`w-full mt-6 py-3 rounded-lg font-bold transition-colors shadow-lg shadow-primary/20 flex items-center justify-center gap-2 ${isSubmitting
+                                    ? 'bg-gray-300 dark:bg-gray-700 cursor-not-allowed text-gray-500 dark:text-gray-400'
+                                    : 'bg-primary text-black hover:bg-primary/90'
+                                    }`}
                             >
-                                {campaignType === 'instant' ? 'Enviar Campanha' : 'Agendar Campanha'}
+                                {isSubmitting ? (
+                                    <>
+                                        <div className="w-5 h-5 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></div>
+                                        {selectedCampaignId ? 'Salvando...' : 'Enviando...'}
+                                    </>
+                                ) : (
+                                    selectedCampaignId ? 'Salvar Alterações' : (campaignType === 'instant' ? 'Enviar Campanha' : 'Agendar Campanha')
+                                )}
                             </button>
                         </div>
                     </div>
                 </div>
 
             </div>
+            {/* Modal de Confirmação de Exclusão */}
+            <DeleteConfirmationModal
+                isOpen={deleteModalOpen}
+                onClose={() => setDeleteModalOpen(false)}
+                onConfirm={confirmDelete}
+                title="Excluir Campanha"
+                message="Tem certeza que deseja excluir esta campanha? Esta ação não pode ser desfeita e todos os dados relacionados serão perdidos."
+                isDeleting={isDeleting}
+            />
         </div>
     );
 };

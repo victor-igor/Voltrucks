@@ -497,11 +497,22 @@ export const ContactDetails: React.FC<ContactDetailsProps> = ({ onBack }) => {
                   </div>
                 ) : (
                   <p className="mt-1.5 text-sm font-medium text-gray-900 dark:text-white">
-                    {contact.telefone ? (
-                      contact.telefone.startsWith(countryCode)
-                        ? contact.telefone.replace(countryCode, `${countryCode} `)
-                        : `${countryCode} ${contact.telefone}`
-                    ) : '-'}
+                    {(() => {
+                      if (!contact.telefone) return '-';
+                      const phone = contact.telefone;
+                      // Case 1: Already has country code symbol (e.g. +55)
+                      if (phone.startsWith(countryCode)) {
+                        return phone.replace(countryCode, `${countryCode} `);
+                      }
+                      // Case 2: Starts with country code digits (e.g. 55...) - avoid duplication
+                      const codeDigits = countryCode.replace(/\D/g, '');
+                      const phoneDigits = phone.replace(/\D/g, '');
+                      if (phoneDigits.startsWith(codeDigits) && phoneDigits.length > codeDigits.length + 4) {
+                        return `${countryCode} ${phoneDigits.substring(codeDigits.length)}`;
+                      }
+                      // Case 3: No country code present, prepend it
+                      return `${countryCode} ${phone}`;
+                    })()}
                   </p>
                 )}
               </div>

@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 
-export type UserRole = 'admin' | 'gestor' | 'vendedor';
+export type UserRole = 'admin' | 'gestor' | 'vendedor' | 'user' | 'veterinario';
 
 export interface UserProfile {
     id: string;
@@ -11,10 +11,10 @@ export interface UserProfile {
     role: UserRole;
     especialidade?: string | null;
     crmv?: string | null;
-    ativo: boolean;
-    created_at: string;
     telefone?: string | null;
     foto_perfil_url?: string | null;
+    ativo: boolean;
+    created_at: string;
 }
 
 /**
@@ -28,39 +28,6 @@ export async function signIn(email: string, password: string) {
 
     if (error) {
         throw error;
-    }
-
-    return data;
-}
-
-/**
- * Realiza o cadastro de um novo usuário (Self-signup - deprecated/unused in UI)
- */
-export async function signUp(email: string, password: string, nome: string) {
-    const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-    });
-
-    if (error) {
-        throw error;
-    }
-
-    if (data.user) {
-        // Criar perfil do usuário
-        const { error: profileError } = await supabase
-            .from('usuarios')
-            .insert({
-                auth_id: data.user.id,
-                email: email,
-                nome: nome,
-                role: 'admin', // Primeiro usuário como admin para facilitar
-                ativo: true
-            });
-
-        if (profileError) {
-            console.error('Erro ao criar perfil:', profileError);
-        }
     }
 
     return data;
@@ -86,6 +53,7 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
 
         if (error) {
             console.error('Error fetching user profile:', error);
+            // If profile doesn't exist but auth user does, return minimal profile or null
             return null;
         }
 
@@ -119,28 +87,6 @@ export async function isAdmin(): Promise<boolean> {
  */
 export async function isAdminOrGestor(): Promise<boolean> {
     return hasRole(['admin', 'gestor']);
-}
-
-/**
- * Lista todos os usuários (apenas admin/gestor)
- */
-export async function listUsers(): Promise<UserProfile[]> {
-    const canView = await isAdminOrGestor();
-    if (!canView) {
-        throw new Error('Sem permissão para listar usuários');
-    }
-
-    const { data, error } = await supabase
-        .from('usuarios')
-        .select('*')
-        .order('nome');
-
-    if (error) {
-        console.error('Error listing users:', error);
-        throw error;
-    }
-
-    return data as UserProfile[];
 }
 
 /**
@@ -178,6 +124,28 @@ export async function updateUser(userId: string, updates: Partial<UserProfile>) 
     }
 
     return data as UserProfile;
+}
+
+/**
+ * Lista todos os usuários (apenas admin/gestor)
+ */
+export async function listUsers(): Promise<UserProfile[]> {
+    const canView = await isAdminOrGestor();
+    if (!canView) {
+        throw new Error('Sem permissão para listar usuários');
+    }
+
+    const { data, error } = await supabase
+        .from('usuarios')
+        .select('*')
+        .order('nome');
+
+    if (error) {
+        console.error('Error listing users:', error);
+        throw error;
+    }
+
+    return data as UserProfile[];
 }
 
 /**
@@ -223,4 +191,3 @@ export async function toggleUserStatus(userId: string, ativo: boolean) {
         throw err;
     }
 }
-

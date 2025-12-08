@@ -138,7 +138,7 @@ export const BlacklistSettings: React.FC = () => {
                     phone: fullPhoneNumber,
                     name: newName.trim() || null,
                     reason: newReason.trim() || null,
-                    created_by: user?.id
+                    created_by: user?.auth_id
                 })
                 .select()
                 .single();

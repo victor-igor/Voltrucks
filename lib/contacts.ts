@@ -27,13 +27,32 @@ export interface Contact {
 }
 
 export async function listContacts() {
-    const { data, error } = await supabase
-        .from('contatos')
-        .select('*')
-        .order('nome_completo');
+    let allContacts: Contact[] = [];
+    let page = 0;
+    const pageSize = 1000;
+    let hasMore = true;
 
-    if (error) throw error;
-    return data as Contact[];
+    while (hasMore) {
+        const { data, error } = await supabase
+            .from('contatos')
+            .select('*')
+            .order('nome_completo')
+            .range(page * pageSize, (page + 1) * pageSize - 1);
+
+        if (error) throw error;
+
+        if (data) {
+            allContacts = [...allContacts, ...data];
+            if (data.length < pageSize) {
+                hasMore = false;
+            }
+        } else {
+            hasMore = false;
+        }
+        page++;
+    }
+
+    return allContacts as Contact[];
 }
 
 export async function getContact(id: string) {

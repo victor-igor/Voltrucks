@@ -9,7 +9,6 @@ import {
   X,
   LogOut,
   Megaphone,
-  Diamond,
   UserCog
 } from 'lucide-react';
 import { usePermissions } from '../hooks/usePermissions';
@@ -64,43 +63,34 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, closeMob
       {/* Desktop Toggle Button */}
       <button
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className="hidden md:flex absolute -right-3 top-9 z-20 bg-white dark:bg-card-dark border border-border-light dark:border-border-dark text-gray-500 dark:text-gray-400 rounded-full p-1 shadow-sm hover:text-primary transition-colors"
+        className="hidden md:flex absolute -right-3 top-9 z-20 bg-card-light dark:bg-card-dark border border-border-light dark:border-border-dark text-gray-500 dark:text-gray-400 rounded-full p-1 shadow-sm hover:text-primary transition-colors"
       >
         {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
       </button>
 
       {/* Logo Area */}
-      <div className={`p-6 flex items-center ${isCollapsed ? 'md:justify-center' : ''} h-20`}>
+      <div className={`p-6 flex items-center justify-center h-20`}>
         {/* Desktop Logo Logic */}
         <div className={`hidden md:block transition-all duration-300`}>
           {isCollapsed ? (
             // Minimized Logo: Icon Only
-            <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/20">
-              <Diamond className="w-5 h-5 text-primary" strokeWidth={2.5} />
+            <div className="flex items-center justify-center">
+              <img src="https://i.imgur.com/JnZ4hbQ.png" alt="Voltrucks Light" className="w-16 h-auto block dark:hidden" />
+              <img src="https://i.imgur.com/qmc8Yl5.png" alt="Voltrucks Dark" className="w-16 h-auto hidden dark:block" />
             </div>
           ) : (
             // Expanded Logo: Icon + Typography
-            <div className="flex items-center gap-3 animate-in fade-in duration-300">
-              <div className="w-9 h-9 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/20 flex-shrink-0">
-                <Diamond className="w-5 h-5 text-primary" strokeWidth={2.5} />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-lg font-bold text-gray-900 dark:text-white leading-none tracking-tight">CAMPOS</span>
-                <span className="text-[10px] text-primary font-bold tracking-[0.3em] leading-none mt-1.5 uppercase">Joias</span>
-              </div>
+            <div className="flex items-center justify-center gap-3 animate-in fade-in duration-300">
+              <img src="https://i.imgur.com/JnZ4hbQ.png" alt="Voltrucks Light" className="h-20 w-auto block dark:hidden" />
+              <img src="https://i.imgur.com/qmc8Yl5.png" alt="Voltrucks Dark" className="h-20 w-auto hidden dark:block" />
             </div>
           )}
         </div>
 
         {/* Mobile Always Shows Full Logo */}
         <div className="md:hidden flex items-center gap-3">
-          <div className="w-9 h-9 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/20 flex-shrink-0">
-            <Diamond className="w-5 h-5 text-primary" strokeWidth={2.5} />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-lg font-bold text-gray-900 dark:text-white leading-none tracking-tight">CAMPOS</span>
-            <span className="text-[10px] text-primary font-bold tracking-[0.3em] leading-none mt-1.5 uppercase">Joias</span>
-          </div>
+          <img src="https://i.imgur.com/JnZ4hbQ.png" alt="Voltrucks Light" className="h-16 w-auto block dark:hidden" />
+          <img src="https://i.imgur.com/qmc8Yl5.png" alt="Voltrucks Dark" className="h-16 w-auto hidden dark:block" />
         </div>
       </div>
 
@@ -124,12 +114,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, closeMob
           <div className="flex justify-between items-center mb-2">
             <div className="flex items-center space-x-2">
               <Cpu className="w-4 h-4 text-primary" />
-              <p className="text-sm font-semibold text-gray-900 dark:text-gray-200">Agente Processando</p>
+              <p className="text-sm font-semibold text-text-light dark:text-text-dark">Agente Processando</p>
             </div>
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 font-mono">Uptime: 48h 27m</p>
           <div className="w-full bg-gray-200 dark:bg-zinc-800 rounded-full h-1.5 overflow-hidden">
-            <div className="bg-primary h-1.5 rounded-full w-[98%]"></div>
+            <div className="bg-gradient-to-r from-primary to-secondary h-1.5 rounded-full w-[98%]"></div>
           </div>
           <p className="text-right text-[10px] font-bold text-gray-500 dark:text-gray-400 mt-1">98% CAPACITY</p>
         </div>
@@ -156,7 +146,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, closeMob
               onClick={() => handleNavigation(item.id)}
               title={isCollapsed ? item.label : ''}
               className={`
-                w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-all duration-200
+                w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-all duration-200 relative overflow-hidden
                 ${isCollapsed ? 'md:justify-center md:px-2' : 'space-x-3'}
                 ${isActive
                   ? 'bg-primary/10 dark:bg-primary/10 text-primary dark:text-primary'
@@ -164,7 +154,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, closeMob
                 }
               `}
             >
-              <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-primary' : ''}`} />
+              {isActive && (
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 h-8 w-1 bg-primary rounded-r-md"></div>
+              )}
+              <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-primary' : ''} ${isCollapsed ? 'z-10' : ''}`} />
               <span className={`whitespace-nowrap ${isCollapsed ? 'md:hidden' : ''}`}>{item.label}</span>
             </button>
           );
@@ -178,7 +171,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, closeMob
             {userProfile?.nome?.charAt(0).toUpperCase() || 'U'}
           </div>
           <div className={`flex-1 overflow-hidden ${isCollapsed ? 'md:hidden' : ''}`}>
-            <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{userProfile?.nome || 'Usuário'}</p>
+            <p className="text-sm font-bold text-text-light dark:text-text-dark truncate">{userProfile?.nome || 'Usuário'}</p>
             <p className="text-xs text-gray-500 truncate">{userProfile?.email || 'email@exemplo.com'}</p>
           </div>
 

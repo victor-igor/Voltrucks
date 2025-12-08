@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Campos Joias AI Dashboard</title>
+  <title>Voltrucks Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet" />
@@ -15,44 +15,48 @@
       theme: {
         extend: {
           colors: {
-            // Brand Colors (Ouro Campos)
-            primary: "#C5A059",
-            "primary-hover": "#B08D45",
-            secondary: "#B08D45",
-            accent: "#10B981",
+            // Brand Colors (Voltrucks Dynamic)
+            primary: "var(--color-primary)",
+            "primary-hover": "var(--color-primary-hover)",
+            secondary: "var(--color-accent)",
+            accent: "var(--color-accent)",
 
-            "background-light": "#F4F6F8",
-            "background-dark": "#121212",
+            "background-light": "#F3F5F7",
+            "background-dark": "#0F1216",
 
             "card-light": "#FFFFFF",
-            "card-dark": "#1E1E1E",
+            "card-dark": "#1A1F29",
 
-            "border-light": "#E0E0E0",
-            "border-dark": "#333333",
+            "border-light": "#E2E8F0",
+            "border-dark": "#2D3748",
 
-            "input-light": "#FFFFFF",
-            "input-dark": "#2C2C2C",
+            "input-light": "#E2E8F0",
+            "input-dark": "#151921",
+
+            "text-light": "#111827",
+            "text-dark": "#FFFFFF",
 
             "muted-light": "#F4F6F8",
-            "muted-dark": "#252525",
+            "muted-dark": "#1A1F29", // Ajustado para ser similar ao card/surface
 
             gray: {
               50: "#F9FAFB",
-              100: "#F4F6F8",
-              200: "#E0E0E0",
+              100: "#F3F5F7",
+              200: "#E2E8F0",
               300: "#D1D5DB",
               400: "#A1A1A1",
               500: "#666666",
               600: "#4B5563",
-              700: "#333333",
-              800: "#1E1E1E",
-              900: "#1A1A1A",
-              950: "#121212",
+              700: "#374151",
+              800: "#1F2937",
+              900: "#111827",
+              950: "#0F1216",
             },
             zinc: {
-              800: "#333333",
-              900: "#1E1E1E",
-              950: "#121212",
+              700: "#2D3748",
+              800: "#1A1F29",
+              900: "#0F1216",
+              950: "#050608",
             }
           },
           fontFamily: {
@@ -68,6 +72,18 @@
   </script>
 
   <style>
+    :root {
+      --color-primary: #0056B3;
+      --color-primary-hover: #004494;
+      --color-accent: #FFCC00;
+    }
+
+    .dark {
+      --color-primary: #0074E0;
+      --color-primary-hover: #0060BA;
+      --color-accent: #FFD700;
+    }
+
     body {
       font-family: 'Inter', sans-serif;
     }
@@ -95,7 +111,7 @@
 </head>
 
 <body
-  class="bg-background-light dark:bg-background-dark text-gray-900 dark:text-[#EDEDED] transition-colors duration-300">
+  class="bg-background-light dark:bg-background-dark text-text-light dark:text-text-dark transition-colors duration-300">
   <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
 </body>

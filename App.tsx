@@ -6,17 +6,20 @@ import { Dashboard } from './components/Dashboard';
 import { ContactsList } from './components/ContactsList';
 import { ContactDetails } from './components/ContactDetails';
 import { AddContactModal } from './components/AddContactModal';
+import { Campaigns } from './components/Campaigns';
 import { Settings } from './components/Settings';
 import { Login } from './components/Login';
 import { CampaignsList } from './components/CampaignsList';
 import { CreateCampaign } from './components/CreateCampaign';
 import { CampaignReport } from './components/CampaignReport';
 import { UserManagement } from './components/UserManagement';
+import { BlacklistSettings } from './components/BlacklistSettings';
+import { InstancesManager } from './components/InstancesManager';
 import { Plus, Menu } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 const Layout: React.FC = () => {
-  const { session, loading } = useAuth();
+  const { session, loading, signOut } = useAuth();
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const savedTheme = localStorage.getItem('theme');
     return savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -41,8 +44,7 @@ const Layout: React.FC = () => {
   const toggleTheme = () => setIsDarkMode(!isDarkMode);
 
   const handleLogout = async () => {
-    // signOut is handled by Sidebar calling useAuth().signOut()
-    // But here we might need to reset view or redirect
+    await signOut();
     navigate('/login');
   };
 
@@ -84,6 +86,8 @@ const Layout: React.FC = () => {
       };
     }
 
+
+
     if (path.startsWith('/users')) {
       return {
         category: 'ADMINISTRAÇÃO',
@@ -114,7 +118,7 @@ const Layout: React.FC = () => {
   const headerProps = getHeaderProps();
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background-light dark:bg-background-dark font-sans text-gray-900 dark:text-[#EDEDED]">
+    <div className="flex h-screen overflow-hidden bg-background-light dark:bg-background-dark font-sans text-text-light dark:text-text-dark">
       {/* Mobile Overlay Backdrop */}
       {isMobileMenuOpen && (
         <div
@@ -181,10 +185,8 @@ const Layout: React.FC = () => {
             <Route path="/" element={<Dashboard />} />
             <Route path="/contacts" element={<ContactsList onEdit={(id) => navigate(`/contacts/details/${id}`)} />} />
             <Route path="/contacts/details/:id" element={<ContactDetails onBack={() => navigate('/contacts')} />} />
-            <Route path="/campaigns" element={<CampaignsList />} />
-            <Route path="/campaigns/new" element={<CreateCampaign />} />
-            <Route path="/campaigns/edit/:id" element={<CreateCampaign />} />
-            <Route path="/campaigns/:id" element={<CampaignReport />} />
+            <Route path="/campaigns" element={<Campaigns />} />
+
             <Route path="/settings" element={<Settings />} />
             <Route path="/users" element={<UserManagement />} />
             <Route path="*" element={<Navigate to="/" replace />} />

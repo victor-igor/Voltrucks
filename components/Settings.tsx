@@ -207,9 +207,9 @@ export const Settings: React.FC = () => {
 
           {/* Profile Tab */}
           {activeTab === 'profile' && (
-            <div className="bg-white dark:bg-card-dark rounded-xl shadow-sm border border-border-light dark:border-border-dark overflow-hidden">
+            <div className="bg-card-light dark:bg-card-dark rounded-xl shadow-sm border border-border-light dark:border-border-dark overflow-hidden">
               <div className="p-6 border-b border-border-light dark:border-border-dark">
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Informações do Perfil</h2>
+                <h2 className="text-lg font-bold text-text-light dark:text-text-dark">Informações do Perfil</h2>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Atualize sua foto e detalhes pessoais.</p>
               </div>
               <div className="p-6 space-y-8">
@@ -244,7 +244,7 @@ export const Settings: React.FC = () => {
                     </label>
                   </div>
                   <div>
-                    <h3 className="font-bold text-gray-900 dark:text-white">{userProfile?.nome || 'Usuário'}</h3>
+                    <h3 className="font-bold text-text-light dark:text-text-dark">{userProfile?.nome || 'Usuário'}</h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-3 capitalize">{userProfile?.role || 'Funcionário'}</p>
                     <div className="flex gap-2">
                       <label className="text-xs font-bold text-primary bg-primary/10 px-3 py-1.5 rounded-lg hover:bg-primary/20 transition-colors cursor-pointer">
@@ -277,7 +277,7 @@ export const Settings: React.FC = () => {
                       type="text"
                       value={formData.nome}
                       onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                      className="w-full rounded-lg border-gray-300 dark:border-border-dark bg-gray-50 dark:bg-input-dark text-gray-900 dark:text-white shadow-sm focus:ring-primary focus:border-primary px-3 py-2.5 sm:text-sm"
+                      className="w-full rounded-lg border-gray-300 dark:border-border-dark bg-gray-50 dark:bg-input-dark text-text-light dark:text-text-dark shadow-sm focus:ring-primary focus:border-primary px-3 py-2.5 sm:text-sm"
                     />
                   </div>
                   <div>
@@ -296,7 +296,7 @@ export const Settings: React.FC = () => {
                       value={formData.telefone}
                       onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
                       placeholder="(00) 00000-0000"
-                      className="w-full rounded-lg border-gray-300 dark:border-border-dark bg-gray-50 dark:bg-input-dark text-gray-900 dark:text-white shadow-sm focus:ring-primary focus:border-primary px-3 py-2.5 sm:text-sm"
+                      className="w-full rounded-lg border-gray-300 dark:border-border-dark bg-gray-50 dark:bg-input-dark text-text-light dark:text-text-dark shadow-sm focus:ring-primary focus:border-primary px-3 py-2.5 sm:text-sm"
                     />
                   </div>
                   <div>
@@ -305,7 +305,7 @@ export const Settings: React.FC = () => {
                       type="text"
                       value={formData.cargo}
                       onChange={(e) => setFormData({ ...formData, cargo: e.target.value })}
-                      className="w-full rounded-lg border-gray-300 dark:border-border-dark bg-gray-50 dark:bg-input-dark text-gray-900 dark:text-white shadow-sm focus:ring-primary focus:border-primary px-3 py-2.5 sm:text-sm"
+                      className="w-full rounded-lg border-gray-300 dark:border-border-dark bg-gray-50 dark:bg-input-dark text-text-light dark:text-text-dark shadow-sm focus:ring-primary focus:border-primary px-3 py-2.5 sm:text-sm"
                     />
                   </div>
                   {(userProfile?.role === 'veterinario' || userProfile?.role === 'admin' || userProfile?.role === 'gestor') && (
