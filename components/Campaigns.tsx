@@ -176,6 +176,22 @@ export const Campaigns: React.FC = () => {
         }
     };
 
+    // Restore selected template and text when editing
+    useEffect(() => {
+        if (viewMode === 'create' && selectedCampaignId && campaigns.length > 0 && templates.length > 0 && !selectedTemplate) {
+            const campaign = campaigns.find(c => c.id === selectedCampaignId);
+            if (campaign && campaign.template_name) {
+                const tmpl = templates.find(t => t.name === campaign.template_name && t.language === campaign.template_language);
+                if (tmpl) {
+                    setSelectedTemplate(tmpl);
+                    // Extract body text to ensure it's saved correctly
+                    const bodyComponent = tmpl.components.find(c => c.type === 'BODY');
+                    setMessageText(bodyComponent?.text || '');
+                }
+            }
+        }
+    }, [templates, selectedCampaignId, viewMode, campaigns, selectedTemplate]);
+
     const loadTags = async () => {
         try {
             const tags = await getTags();
@@ -220,9 +236,10 @@ export const Campaigns: React.FC = () => {
             }
         }
 
-        if (campaign.template_name) {
-            const tmpl = templates.find(t => t.name === campaign.template_name && t.language === campaign.template_language);
-            if (tmpl) setSelectedTemplate(tmpl);
+
+
+        if (campaign.template_text) {
+            setMessageText(campaign.template_text);
         }
 
         setDailyLimit(campaign.daily_limit);
@@ -289,6 +306,7 @@ export const Campaigns: React.FC = () => {
             media_url: undefined,
             daily_limit: dailyLimit ? Number(dailyLimit) : undefined,
             message_variations: [selectedTemplate.name],
+            template_text: messageText || selectedTemplate.components.find(c => c.type === 'BODY')?.text || selectedTemplate.components.find(c => c.text)?.text || '',
             ...templateData,
         };
 

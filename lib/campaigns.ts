@@ -32,6 +32,7 @@ export interface Campaign {
     message_variations: string[]; // Still used for internal storage, but will store template name/body
     template_name?: string; // New field for reference
     template_language?: string; // New field for reference
+    template_text?: string; // Storing the actual text of the template body
 }
 
 export interface WhatsAppTemplate {
@@ -81,6 +82,8 @@ export async function createCampaign(campaign: Omit<Campaign, 'id' | 'created_at
 
     if (!user) throw new Error('User not authenticated');
 
+    console.log('Creating campaign with payload:', campaign);
+
     const { data, error } = await supabase
         .from('campaigns')
         .insert([
@@ -96,6 +99,7 @@ export async function createCampaign(campaign: Omit<Campaign, 'id' | 'created_at
                 message_variations: campaign.message_variations,
                 template_name: campaign.template_name,
                 template_language: campaign.template_language,
+                template_text: campaign.template_text,
                 status: 'pending', // Default status for new campaigns
                 created_by: user.id
             }
