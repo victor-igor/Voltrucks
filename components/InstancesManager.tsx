@@ -12,10 +12,13 @@ import {
     MoreVertical,
     Power,
     MessageSquare,
-    Megaphone
+    Megaphone,
+    Settings,
+    Save
 } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
 import { whatsappService, WhatsAppInstance } from '../lib/whatsapp';
+import { supabase } from '../lib/supabase';
 
 export const InstancesManager: React.FC = () => {
     const { success, error, info } = useToast();
@@ -35,6 +38,35 @@ export const InstancesManager: React.FC = () => {
 
     // Chatwoot Status State
     const [chatwootStatus, setChatwootStatus] = useState<Record<string, { enabled: boolean; loading: boolean }>>({});
+
+    // Global Chatwoot Config Modal State
+    const [globalConfigModal, setGlobalConfigModal] = useState<{
+        isOpen: boolean;
+        loading: boolean;
+        saving: boolean;
+        config: {
+            url: string;
+            access_token: string;
+            account_id: string;
+            inbox_id: string;
+            ignore_groups: boolean;
+            sign_messages: boolean;
+            create_new_conversation: boolean;
+        };
+    }>({
+        isOpen: false,
+        loading: false,
+        saving: false,
+        config: {
+            url: 'https://chatwoot.eloscope.com.br',
+            access_token: '',
+            account_id: '1',
+            inbox_id: '',
+            ignore_groups: true,
+            sign_messages: false,
+            create_new_conversation: false
+        }
+    });
 
     // Confirmation Modal State
     const [confirmation, setConfirmation] = useState<{
@@ -162,21 +194,83 @@ export const InstancesManager: React.FC = () => {
         }
     };
 
+    const handleOpenGlobalConfig = async () => {
+        try {
+            setGlobalConfigModal(prev => ({ ...prev, isOpen: true, loading: true }));
+
+            const { data, error } = await supabase
+                .from('integration_settings')
+                .select('config')
+                .eq('service_name', 'chatwoot')
+                .single();
+
+            if (data && data.config) {
+                setGlobalConfigModal(prev => ({
+                    ...prev,
+                    config: { ...prev.config, ...data.config },
+                    loading: false
+                }));
+            } else {
+                setGlobalConfigModal(prev => ({ ...prev, loading: false }));
+            }
+        } catch (err) {
+            console.error('Erro ao carregar configurações:', err);
+            error('Erro ao carregar configurações');
+            setGlobalConfigModal(prev => ({ ...prev, loading: false }));
+        }
+    };
+
+    const handleSaveGlobalConfig = async () => {
+        try {
+            setGlobalConfigModal(prev => ({ ...prev, saving: true }));
+
+            const { error: upsertError } = await supabase
+                .from('integration_settings')
+                .upsert({
+                    service_name: 'chatwoot',
+                    config: globalConfigModal.config,
+                    updated_at: new Date()
+                }, { onConflict: 'service_name' });
+
+            if (upsertError) throw upsertError;
+
+            success('Configuração global do Chatwoot salva!');
+            setGlobalConfigModal(prev => ({ ...prev, isOpen: false }));
+        } catch (err) {
+            console.error('Erro ao salvar configuração:', err);
+            error('Erro ao salvar configuração');
+        } finally {
+            setGlobalConfigModal(prev => ({ ...prev, saving: false }));
+        }
+    };
+
     const handleConnectChatwoot = async (instanceId: string) => {
         try {
+            // First, fetch global configuration
+            const { data: configData, error: configError } = await supabase
+                .from('integration_settings')
+                .select('config')
+                .eq('service_name', 'chatwoot')
+                .single();
+
+            if (configError || !configData || !configData.config || !configData.config.access_token) {
+                error('Configuração do Chatwoot não encontrada ou incompleta. Clique em "Configurar Integração" no topo da página.');
+                return;
+            }
+
             setChatwootStatus(prev => ({
                 ...prev,
                 [instanceId]: { ...prev[instanceId], loading: true }
             }));
 
-            await whatsappService.connectChatwoot(instanceId);
+            await whatsappService.connectChatwoot(instanceId, configData.config);
 
             setChatwootStatus(prev => ({
                 ...prev,
                 [instanceId]: { enabled: true, loading: false }
             }));
 
-            success('Chatwoot conectado com sucesso!');
+            success('Chatwoot conectado com a configuração global!');
         } catch (err: any) {
             console.error(err);
             error(err.message || 'Erro ao conectar Chatwoot');
@@ -367,6 +461,13 @@ export const InstancesManager: React.FC = () => {
                     </p>
                 </div>
                 <div className="flex gap-2">
+                    <button
+                        onClick={handleOpenGlobalConfig}
+                        className="p-2 text-gray-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                        title="Configurar Integração Chatwoot"
+                    >
+                        <Settings className="w-5 h-5" />
+                    </button>
                     <button
                         onClick={loadInstances}
                         className="p-2 text-gray-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
@@ -691,6 +792,159 @@ export const InstancesManager: React.FC = () => {
                                     <li>Aponte a câmera para a tela para capturar o código</li>
                                 </ol>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Global Chatwoot Config Modal */}
+            {globalConfigModal.isOpen && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-card-dark rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+                        <div className="p-6 border-b border-gray-200 dark:border-border-dark flex justify-between items-center">
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                <Settings className="w-5 h-5 text-primary" />
+                                Configuração Global do Chatwoot
+                            </h3>
+                            <button
+                                onClick={() => setGlobalConfigModal(prev => ({ ...prev, isOpen: false }))}
+                                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                            >
+                                <XCircle className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-4 overflow-y-auto custom-scrollbar">
+                            {globalConfigModal.loading ? (
+                                <div className="flex justify-center py-8">
+                                    <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                                </div>
+                            ) : (
+                                <>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            URL do Chatwoot
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={globalConfigModal.config.url}
+                                            onChange={(e) => setGlobalConfigModal(prev => ({
+                                                ...prev,
+                                                config: { ...prev.config, url: e.target.value }
+                                            }))}
+                                            className="w-full rounded-lg border-gray-300 dark:border-border-dark bg-gray-50 dark:bg-input-dark text-gray-900 dark:text-white shadow-sm focus:ring-primary focus:border-primary px-3 py-2"
+                                            placeholder="https://chatwoot.seudominio.com"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            Access Token (API Key)
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={globalConfigModal.config.access_token}
+                                            onChange={(e) => setGlobalConfigModal(prev => ({
+                                                ...prev,
+                                                config: { ...prev.config, access_token: e.target.value }
+                                            }))}
+                                            className="w-full rounded-lg border-gray-300 dark:border-border-dark bg-gray-50 dark:bg-input-dark text-gray-900 dark:text-white shadow-sm focus:ring-primary focus:border-primary px-3 py-2"
+                                            placeholder="Token de acesso do usuário"
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                Account ID
+                                            </label>
+                                            <input
+                                                type="number"
+                                                value={globalConfigModal.config.account_id}
+                                                onChange={(e) => setGlobalConfigModal(prev => ({
+                                                    ...prev,
+                                                    config: { ...prev.config, account_id: e.target.value }
+                                                }))}
+                                                className="w-full rounded-lg border-gray-300 dark:border-border-dark bg-gray-50 dark:bg-input-dark text-gray-900 dark:text-white shadow-sm focus:ring-primary focus:border-primary px-3 py-2"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                Inbox ID
+                                            </label>
+                                            <input
+                                                type="number"
+                                                value={globalConfigModal.config.inbox_id}
+                                                onChange={(e) => setGlobalConfigModal(prev => ({
+                                                    ...prev,
+                                                    config: { ...prev.config, inbox_id: e.target.value }
+                                                }))}
+                                                className="w-full rounded-lg border-gray-300 dark:border-border-dark bg-gray-50 dark:bg-input-dark text-gray-900 dark:text-white shadow-sm focus:ring-primary focus:border-primary px-3 py-2"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-3 pt-2">
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={globalConfigModal.config.ignore_groups}
+                                                onChange={(e) => setGlobalConfigModal(prev => ({
+                                                    ...prev,
+                                                    config: { ...prev.config, ignore_groups: e.target.checked }
+                                                }))}
+                                                className="rounded border-gray-300 text-primary focus:ring-primary"
+                                            />
+                                            <span className="text-sm text-gray-700 dark:text-gray-300">Ignorar Grupos</span>
+                                        </label>
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={globalConfigModal.config.sign_messages}
+                                                onChange={(e) => setGlobalConfigModal(prev => ({
+                                                    ...prev,
+                                                    config: { ...prev.config, sign_messages: e.target.checked }
+                                                }))}
+                                                className="rounded border-gray-300 text-primary focus:ring-primary"
+                                            />
+                                            <span className="text-sm text-gray-700 dark:text-gray-300">Assinar Mensagens</span>
+                                        </label>
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={globalConfigModal.config.create_new_conversation}
+                                                onChange={(e) => setGlobalConfigModal(prev => ({
+                                                    ...prev,
+                                                    config: { ...prev.config, create_new_conversation: e.target.checked }
+                                                }))}
+                                                className="rounded border-gray-300 text-primary focus:ring-primary"
+                                            />
+                                            <span className="text-sm text-gray-700 dark:text-gray-300">Criar nova conversa para cada atendimento</span>
+                                        </label>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+
+                        <div className="p-6 border-t border-gray-200 dark:border-border-dark flex justify-end gap-3">
+                            <button
+                                onClick={() => setGlobalConfigModal(prev => ({ ...prev, isOpen: false }))}
+                                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-sm font-medium transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleSaveGlobalConfig}
+                                disabled={globalConfigModal.saving}
+                                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 text-sm font-medium transition-colors flex items-center gap-2"
+                            >
+                                {globalConfigModal.saving ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    <Save className="w-4 h-4" />
+                                )}
+                                Salvar Configuração
+                            </button>
                         </div>
                     </div>
                 </div>

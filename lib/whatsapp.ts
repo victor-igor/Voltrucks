@@ -357,7 +357,7 @@ export const whatsappService = {
     },
 
     // 8. Conectar ao Chatwoot
-    async connectChatwoot(id: string) {
+    async connectChatwoot(id: string, config?: any) {
         try {
             const { data: instance, error } = await supabase
                 .from('whatsapp_instances')
@@ -367,19 +367,30 @@ export const whatsappService = {
 
             if (error || !instance) throw new Error('Instância não encontrada');
 
+            const bodyContent = config ? {
+                enabled: true,
+                url: config.url,
+                access_token: config.access_token,
+                account_id: parseInt(config.account_id) || 1,
+                inbox_id: parseInt(config.inbox_id),
+                ignore_groups: config.ignore_groups,
+                sign_messages: config.sign_messages,
+                create_new_conversation: config.create_new_conversation
+            } : {
+                enabled: true,
+                url: "https://chatwoot.eloscope.com.br",
+                access_token: "5aqYAqWSQXvKAsYkn9Dp9jC2",
+                account_id: 1,
+                inbox_id: 4,
+                ignore_groups: true,
+                sign_messages: false,
+                create_new_conversation: false
+            };
+
             const response = await fetch(`${UAZAPI_URL}/chatwoot/config`, {
                 method: 'PUT',
                 headers: getHeaders(instance.token),
-                body: JSON.stringify({
-                    enabled: true,
-                    url: "https://chatwoot.eloscope.com.br",
-                    access_token: "5aqYAqWSQXvKAsYkn9Dp9jC2",
-                    account_id: 1,
-                    inbox_id: 4,
-                    ignore_groups: true,
-                    sign_messages: false,
-                    create_new_conversation: false
-                })
+                body: JSON.stringify(bodyContent)
             });
 
             if (!response.ok) {
