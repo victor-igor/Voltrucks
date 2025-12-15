@@ -188,9 +188,10 @@ export const InstancesManager: React.FC = () => {
     };
 
     const handleOpenCreateModal = () => {
-        // Limit temporarily set to 0 for plan restrictions
-        if (instances.length >= 0) {
-            error('Seu plano atual não permite criar instâncias do WhatsApp. Entre em contato para fazer o upgrade.');
+        console.log('Current instances:', instances);
+        // Limit temporarily increased to 5
+        if (instances.length >= 5) {
+            error('Seu plano atual não permite criar mais instâncias do WhatsApp (Máximo: 5).');
             return;
         }
         setNewInstanceName('');
