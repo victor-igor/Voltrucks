@@ -19,6 +19,17 @@ export const ContactsList: React.FC<ContactsListProps> = ({ onEdit }) => {
 
   useEffect(() => {
     loadContacts();
+
+    // Listen for contact updates
+    const handleContactUpdate = () => {
+      loadContacts();
+    };
+
+    window.addEventListener('contactUpdated', handleContactUpdate);
+
+    return () => {
+      window.removeEventListener('contactUpdated', handleContactUpdate);
+    };
   }, []);
 
   const loadContacts = async () => {
@@ -221,8 +232,8 @@ export const ContactsList: React.FC<ContactsListProps> = ({ onEdit }) => {
                       onClick={() => handlePageChange(p)}
                       aria-current={currentPage === p ? 'page' : undefined}
                       className={`relative z-10 inline-flex items-center px-4 py-2 text-sm font-semibold focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${currentPage === p
-                          ? 'bg-primary text-white focus-visible:outline-primary'
-                          : 'text-gray-900 ring-1 ring-inset ring-border-light hover:bg-gray-50 dark:text-white dark:hover:bg-muted-dark'
+                        ? 'bg-primary text-white focus-visible:outline-primary'
+                        : 'text-gray-900 ring-1 ring-inset ring-border-light hover:bg-gray-50 dark:text-white dark:hover:bg-muted-dark'
                         }`}
                     >
                       {p}

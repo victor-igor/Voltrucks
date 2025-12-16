@@ -100,7 +100,7 @@ export async function createCampaign(campaign: Omit<Campaign, 'id' | 'created_at
                 template_name: campaign.template_name,
                 template_language: campaign.template_language,
                 template_text: campaign.template_text,
-                status: 'pending', // Default status for new campaigns
+                status: campaign.type === 'recurring' ? 'active' : 'pending', // Auto-activate recurring campaigns
                 created_by: user.id
             }
         ])

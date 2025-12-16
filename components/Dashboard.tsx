@@ -10,12 +10,28 @@ import {
     ArrowRightLeft,
     Zap,
     HelpCircle,
-    TrendingUp
+    TrendingUp,
+    Construction
 } from 'lucide-react';
 
 type TimeRange = 'today' | '7days' | '30days' | 'custom';
 
 export const Dashboard: React.FC = () => {
+    // Development Mode Overlay
+    return (
+        <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-8 animate-in fade-in zoom-in duration-500">
+            <div className="bg-primary/10 p-6 rounded-full mb-6">
+                <Construction className="w-16 h-16 text-primary animate-pulse" />
+            </div>
+            <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-2">
+                Dashboard em Desenvolvimento
+            </h2>
+            <p className="text-gray-500 dark:text-gray-400 max-w-md">
+                Estamos preparando métricas incríveis para você acompanhar o desempenho do seu negócio. Em breve novidades!
+            </p>
+        </div>
+    );
+
     const [timeRange, setTimeRange] = useState<TimeRange>('30days');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
@@ -275,8 +291,8 @@ export const Dashboard: React.FC = () => {
                                         <div className="w-full bg-gray-100 dark:bg-zinc-800 rounded-full h-2.5 overflow-hidden">
                                             <div
                                                 className={`h-2.5 rounded-full transition-all duration-1000 ease-out ${index === 0 ? 'bg-primary shadow-[0_0_10px_rgba(0,255,255,0.5)]' :
-                                                        index === 1 ? 'bg-secondary shadow-[0_0_10px_rgba(255,0,255,0.5)]' :
-                                                            'bg-gray-400 dark:bg-gray-600'
+                                                    index === 1 ? 'bg-secondary shadow-[0_0_10px_rgba(255,0,255,0.5)]' :
+                                                        'bg-gray-400 dark:bg-gray-600'
                                                     }`}
                                                 style={{ width: `${item.percentage}%` }}
                                             ></div>
