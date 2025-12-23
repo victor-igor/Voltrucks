@@ -148,33 +148,52 @@ export async function getCampaignStats(campaignId: string, startDate?: string, e
         if (!error) metrics = data;
     }
 
-    // 2. Fetch detailed logs for the list view and hourly chart
-    let query = supabase
-        .from('campaign_logs')
-        .select('*')
-        .eq('campaign_id', campaignId)
-        .order('created_at', { ascending: false });
+    // 2. Fetch detailed logs using recursive pagination to get ALL records
+    let allLogs: any[] = [];
+    let page = 0;
+    const pageSize = 1000;
+    let hasMore = true;
 
-    if (startDate) {
-        query = query.gte('created_at', startDate);
+    while (hasMore) {
+        let query = supabase
+            .from('campaign_logs')
+            .select('*')
+            .eq('campaign_id', campaignId)
+            .order('created_at', { ascending: false });
+
+        if (startDate) {
+            query = query.gte('created_at', startDate);
+        }
+        if (endDate) {
+            const endDateTime = new Date(endDate);
+            endDateTime.setHours(23, 59, 59, 999);
+            query = query.lte('created_at', endDateTime.toISOString());
+        }
+
+        const { data, error } = await query.range(page * pageSize, (page + 1) * pageSize - 1);
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+            allLogs = [...allLogs, ...data];
+            // If we got fewer than pageSize, we've reached the end
+            if (data.length < pageSize) {
+                hasMore = false;
+            }
+        } else {
+            hasMore = false;
+        }
+        page++;
+
+        // Safety break
+        if (page > 100) break;
     }
-    if (endDate) {
-        // Add time to end date to include the full day
-        const endDateTime = new Date(endDate);
-        endDateTime.setHours(23, 59, 59, 999);
-        query = query.lte('created_at', endDateTime.toISOString());
-    }
 
-    const { data: logs, error: logsError } = await query;
+    const logs = allLogs;
 
-    if (logsError) throw logsError;
-
-    // Calculate metrics from logs (always calculate if filtering, or fallback if metrics table is empty)
-    // If we have metrics and no filter, we could use them, but calculating from logs ensures consistency
-    // especially since we just fetched them. Let's prioritize dynamic calculation for the report view.
-
+    // Calculate metrics from full logs
     const total = logs.length;
-    const sent = logs.length; // Total processed
+    const sent = logs.length;
     const delivered = logs.filter(l => l.status === 'success' || l.status === 'delivered').length;
     const failed = logs.filter(l => l.status === 'failed').length;
 
@@ -190,25 +209,35 @@ export async function getCampaignStats(campaignId: string, startDate?: string, e
         if (log.status === 'failed') variationStats[key].failed++;
     });
 
-    // Group by hour for "Response Times" (Activity Distribution)
-    const hourlyDistribution = Array.from({ length: 24 }, (_, i) => ({
-        hour: `${i.toString().padStart(2, '0')}:00`,
-        sent: 0,
-        delivered: 0,
-        failed: 0
-    }));
+    // Group by Day/Hour for "Timeline" (Activity Distribution)
+    const timelineMap: Record<string, { time: string, sent: number, delivered: number, failed: number, timestamp: number }> = {};
 
     logs.forEach(curr => {
         const date = new Date(curr.created_at);
-        const hour = date.getHours();
-        if (hourlyDistribution[hour]) {
-            if (curr.status === 'success' || curr.status === 'delivered') {
-                hourlyDistribution[hour].sent++;
-                hourlyDistribution[hour].delivered++;
-            }
-            if (curr.status === 'failed') hourlyDistribution[hour].failed++;
+        // Format: DD/MM HH:00
+        const day = date.getDate().toString().padStart(2, '0');
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const hour = date.getHours().toString().padStart(2, '0');
+        const key = `${day}/${month} ${hour}:00`;
+
+        if (!timelineMap[key]) {
+            timelineMap[key] = {
+                time: key,
+                sent: 0,
+                delivered: 0,
+                failed: 0,
+                timestamp: date.setMinutes(0, 0, 0) // For sorting
+            };
         }
+
+        if (curr.status === 'success' || curr.status === 'delivered') {
+            timelineMap[key].sent++;
+            timelineMap[key].delivered++;
+        }
+        if (curr.status === 'failed') timelineMap[key].failed++;
     });
+
+    const timelineDistribution = Object.values(timelineMap).sort((a, b) => a.timestamp - b.timestamp);
 
     // 3. Fetch campaign details to get message variations (fallback for logs without content)
     const { data: campaign, error: campaignError } = await supabase
@@ -224,7 +253,7 @@ export async function getCampaignStats(campaignId: string, startDate?: string, e
         sent,
         delivered,
         failed,
-        hourlyDistribution,
+        timelineDistribution,
         logs,
         variationStats,
         campaign // Return the full campaign object

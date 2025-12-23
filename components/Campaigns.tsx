@@ -58,6 +58,11 @@ export const Campaigns: React.FC = () => {
     const [customStartDate, setCustomStartDate] = useState('');
     const [customEndDate, setCustomEndDate] = useState('');
 
+    // --- Report Filter State ---
+    const [reportTimeRange, setReportTimeRange] = useState<TimeRange>('30days');
+    const [reportStartDate, setReportStartDate] = useState('');
+    const [reportEndDate, setReportEndDate] = useState('');
+
     // --- Form State ---
     const [campaignName, setCampaignName] = useState('');
     const [provider, setProvider] = useState<'official' | 'unofficial'>('official'); // Default Provider
@@ -103,11 +108,37 @@ export const Campaigns: React.FC = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
 
+    const getReportDateRange = () => {
+        const end = new Date();
+        let start = new Date();
+
+        switch (reportTimeRange) {
+            case 'today':
+                start = new Date();
+                start.setHours(0, 0, 0, 0);
+                return { start: start.toISOString(), end: end.toISOString() };
+            case '7days':
+                start.setDate(end.getDate() - 7);
+                return { start: start.toISOString(), end: end.toISOString() };
+            case '30days':
+                start.setDate(end.getDate() - 30);
+                return { start: start.toISOString(), end: end.toISOString() };
+            case 'custom':
+                if (reportStartDate && reportEndDate) {
+                    return { start: reportStartDate, end: reportEndDate };
+                }
+                return null;
+            default:
+                return null;
+        }
+    };
+
     const loadReportStats = async (campaignId: string) => {
         try {
             setLoading(true);
             setCurrentPage(1);
-            const data = await getCampaignStats(campaignId);
+            const range = getReportDateRange();
+            const data = await getCampaignStats(campaignId, range?.start, range?.end);
             setStats(data);
         } catch (err) {
             console.error(err);
@@ -116,6 +147,13 @@ export const Campaigns: React.FC = () => {
             setLoading(false);
         }
     };
+
+    // Reload stats when filters change
+    useEffect(() => {
+        if (viewMode === 'report' && selectedCampaignId) {
+            loadReportStats(selectedCampaignId);
+        }
+    }, [reportTimeRange, reportStartDate, reportEndDate]);
 
     const handleViewReport = (campaignId: string) => {
         navigate(`/campaigns/report/${campaignId}`);
@@ -562,8 +600,8 @@ export const Campaigns: React.FC = () => {
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
-    const getButtonStyle = (range: TimeRange) => {
-        const isActive = timeRange === range;
+    const getButtonStyle = (range: TimeRange, current: TimeRange) => {
+        const isActive = current === range;
         return isActive
             ? "text-xs font-bold px-3 py-1.5 rounded-md bg-primary text-black shadow-sm transition-all"
             : "text-xs font-medium px-3 py-1.5 rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-muted-dark transition-colors";
@@ -591,6 +629,38 @@ export const Campaigns: React.FC = () => {
                         <span className="font-bold">Voltar para Campanhas</span>
                     </button>
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Relatório de Desempenho</h2>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+                    <div className="flex items-center bg-white dark:bg-card-dark p-1 rounded-lg border border-gray-200 dark:border-border-dark shadow-sm w-full sm:w-auto overflow-x-auto">
+                        <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 px-3 whitespace-nowrap">PERÍODO:</span>
+                        <button onClick={() => setReportTimeRange('today')} className={getButtonStyle('today', reportTimeRange)}>Hoje</button>
+                        <button onClick={() => setReportTimeRange('7days')} className={getButtonStyle('7days', reportTimeRange)}>7 Dias</button>
+                        <button onClick={() => setReportTimeRange('30days')} className={getButtonStyle('30days', reportTimeRange)}>30 Dias</button>
+                        <button onClick={() => setReportTimeRange('custom')} className={getButtonStyle('custom', reportTimeRange)}>Personalizado</button>
+                    </div>
+
+                    {reportTimeRange === 'custom' && (
+                        <div className="flex items-center gap-2 bg-white dark:bg-card-dark p-1 rounded-lg border border-gray-200 dark:border-border-dark shadow-sm animate-in slide-in-from-right-4 duration-300">
+                            <div className="relative">
+                                <input
+                                    type="date"
+                                    value={reportStartDate}
+                                    onChange={(e) => setReportStartDate(e.target.value)}
+                                    className="text-xs font-medium bg-transparent border-none text-gray-900 dark:text-white focus:ring-0 p-1.5"
+                                />
+                            </div>
+                            <span className="text-gray-400 dark:text-gray-500">-</span>
+                            <div className="relative">
+                                <input
+                                    type="date"
+                                    value={reportEndDate}
+                                    onChange={(e) => setReportEndDate(e.target.value)}
+                                    className="text-xs font-medium bg-transparent border-none text-gray-900 dark:text-white focus:ring-0 p-1.5"
+                                />
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* KPI Cards */}
@@ -637,12 +707,12 @@ export const Campaigns: React.FC = () => {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     {/* Hourly Distribution Chart */}
                     <div className="bg-white dark:bg-card-dark p-6 rounded-xl border border-border-light dark:border-border-dark shadow-sm">
-                        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Horários de Resposta (Atividade)</h3>
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Cronograma de Atividade (Dia e Hora)</h3>
                         <div className="h-80">
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={stats.hourlyDistribution}>
+                                <BarChart data={stats.timelineDistribution}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
-                                    <XAxis dataKey="hour" stroke="#9CA3AF" fontSize={10} tickLine={false} axisLine={false} />
+                                    <XAxis dataKey="time" stroke="#9CA3AF" fontSize={10} tickLine={false} axisLine={false} />
                                     <YAxis stroke="#9CA3AF" fontSize={12} tickLine={false} axisLine={false} />
                                     <Tooltip
                                         contentStyle={{ backgroundColor: '#1F2937', border: 'none', borderRadius: '8px', color: '#fff' }}
@@ -842,9 +912,9 @@ export const Campaigns: React.FC = () => {
                                 <CalendarIcon className="w-3 h-3" />
                                 PERÍODO:
                             </span>
-                            <button onClick={() => setTimeRange('today')} className={getButtonStyle('today')}>Hoje</button>
-                            <button onClick={() => setTimeRange('7days')} className={getButtonStyle('7days')}>7 Dias</button>
-                            <button onClick={() => setTimeRange('30days')} className={getButtonStyle('30days')}>30 Dias</button>
+                            <button onClick={() => setTimeRange('today')} className={getButtonStyle('today', timeRange)}>Hoje</button>
+                            <button onClick={() => setTimeRange('7days')} className={getButtonStyle('7days', timeRange)}>7 Dias</button>
+                            <button onClick={() => setTimeRange('30days')} className={getButtonStyle('30days', timeRange)}>30 Dias</button>
                         </div>
 
                         <button

@@ -28,6 +28,10 @@ export const CampaignReport: React.FC = () => {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
 
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 50;
+
     useEffect(() => {
         if (id) {
             loadStats(id);
@@ -95,6 +99,10 @@ export const CampaignReport: React.FC = () => {
             </div>
         );
     }
+
+    // Pagination Logic
+    const totalPages = stats?.logs ? Math.ceil(stats.logs.length / itemsPerPage) : 0;
+    const paginatedLogs = stats?.logs ? stats.logs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage) : [];
 
     return (
         <div className="animate-in fade-in slide-in-from-right-4 duration-500 p-6 space-y-8">
@@ -203,12 +211,12 @@ export const CampaignReport: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Hourly Distribution Chart */}
                 <div className="bg-white dark:bg-card-dark p-6 rounded-xl border border-border-light dark:border-border-dark shadow-sm">
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Horários de Resposta (Atividade)</h3>
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Cronograma de Atividade (Dia e Hora)</h3>
                     <div className="h-80">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={stats.hourlyDistribution}>
+                            <BarChart data={stats.timelineDistribution}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
-                                <XAxis dataKey="hour" stroke="#9CA3AF" fontSize={10} tickLine={false} axisLine={false} />
+                                <XAxis dataKey="time" stroke="#9CA3AF" fontSize={10} tickLine={false} axisLine={false} />
                                 <YAxis stroke="#9CA3AF" fontSize={12} tickLine={false} axisLine={false} />
                                 <Tooltip
                                     contentStyle={{ backgroundColor: '#1F2937', border: 'none', borderRadius: '8px', color: '#fff' }}
@@ -280,8 +288,8 @@ export const CampaignReport: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border-light dark:divide-border-dark">
-                            {stats.logs && stats.logs.length > 0 ? (
-                                stats.logs.map((log: any) => (
+                            {paginatedLogs && paginatedLogs.length > 0 ? (
+                                paginatedLogs.map((log: any) => (
                                     <tr key={log.id} className="hover:bg-gray-50 dark:hover:bg-muted-dark/50 transition-colors">
                                         <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
                                             {log.phone || log.contact_phone || log.contact_id || 'N/A'}
@@ -327,6 +335,34 @@ export const CampaignReport: React.FC = () => {
                     </table>
                 </div>
             </div>
+
+            {/* Pagination Controls */}
+            {stats.logs && stats.logs.length > 0 && (
+                <div className="flex items-center justify-between bg-white dark:bg-card-dark p-4 rounded-xl border border-border-light dark:border-border-dark shadow-sm">
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                        Mostrando <span className="font-bold text-gray-900 dark:text-white">{(currentPage - 1) * itemsPerPage + 1}</span> a <span className="font-bold text-gray-900 dark:text-white">{Math.min(currentPage * itemsPerPage, stats.logs.length)}</span> de <span className="font-bold text-gray-900 dark:text-white">{stats.logs.length}</span> registros
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                            disabled={currentPage === 1}
+                            className="px-3 py-1.5 text-sm font-medium rounded-md bg-gray-100 dark:bg-muted-dark text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            Anterior
+                        </button>
+                        <span className="text-sm text-gray-600 dark:text-gray-300 font-medium px-2">
+                            Página {currentPage} de {totalPages}
+                        </span>
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                            disabled={currentPage === totalPages}
+                            className="px-3 py-1.5 text-sm font-medium rounded-md bg-gray-100 dark:bg-muted-dark text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            Próxima
+                        </button>
+                    </div>
+                </div>
+            )}
         </div >
     );
 };
