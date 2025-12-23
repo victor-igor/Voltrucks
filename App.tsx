@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { Dashboard } from './components/Dashboard';
@@ -9,17 +9,15 @@ import { AddContactModal } from './components/AddContactModal';
 import { Campaigns } from './components/Campaigns';
 import { Settings } from './components/Settings';
 import { Login } from './components/Login';
-import { CampaignsList } from './components/CampaignsList';
-import { CreateCampaign } from './components/CreateCampaign';
-import { CampaignReport } from './components/CampaignReport';
 import { UserManagement } from './components/UserManagement';
-import { BlacklistSettings } from './components/BlacklistSettings';
-import { InstancesManager } from './components/InstancesManager';
 import { Plus, Menu } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { PrivateRoute, PublicRoute } from './components/Routes';
+import { NotFound } from './components/NotFound';
+import { VersionChecker } from './components/VersionChecker';
 
 const Layout: React.FC = () => {
-  const { session, loading, signOut } = useAuth();
+  const { signOut } = useAuth();
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const savedTheme = localStorage.getItem('theme');
     return savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -86,8 +84,6 @@ const Layout: React.FC = () => {
       };
     }
 
-
-
     if (path.startsWith('/users')) {
       return {
         category: 'ADMINISTRAÇÃO',
@@ -98,22 +94,10 @@ const Layout: React.FC = () => {
 
     return {
       category: 'APP',
-      title: 'Campos Joias AI',
+      title: 'Voltrucks AI',
       description: ''
     };
   };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-background-light dark:bg-background-dark text-gray-500 dark:text-gray-400">
-        Carregando...
-      </div>
-    );
-  }
-
-  if (!session) {
-    return <Navigate to="/login" replace />;
-  }
 
   const headerProps = getHeaderProps();
 
@@ -166,9 +150,6 @@ const Layout: React.FC = () => {
             </Header>
           )}
 
-          {/* If header is null (details views), allow manual theme toggle if needed, 
-                or rely on internal components to show navigation. 
-                For consistency, we can render a minimal header or just content. */}
           {!headerProps && (
             <div className="flex justify-end mb-2">
               {/* Mobile Menu Button (Standalone for details views) */}
@@ -181,16 +162,9 @@ const Layout: React.FC = () => {
             </div>
           )}
 
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/contacts" element={<ContactsList onEdit={(id) => navigate(`/contacts/details/${id}`)} />} />
-            <Route path="/contacts/details/:id" element={<ContactDetails onBack={() => navigate('/contacts')} />} />
-            <Route path="/campaigns" element={<Campaigns />} />
+          {/* Render Nested Routes */}
+          <Outlet />
 
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/users" element={<UserManagement />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
         </div>
       </main>
 
@@ -200,33 +174,51 @@ const Layout: React.FC = () => {
   );
 };
 
+const AppRoutes: React.FC = () => {
+  const navigate = useNavigate();
+
+  return (
+    <Routes>
+      {/* Public Routes */}
+      <Route path="/login" element={
+        <PublicRoute>
+          <Login onLogin={() => navigate('/')} />
+        </PublicRoute>
+      } />
+
+      {/* Private Routes (Inside Layout) */}
+      <Route element={
+        <PrivateRoute>
+          <Layout />
+        </PrivateRoute>
+      }>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/contacts" element={<ContactsList onEdit={(id) => navigate(`/contacts/details/${id}`)} />} />
+        <Route path="/contacts/details/:id" element={<ContactDetails onBack={() => navigate('/contacts')} />} />
+        <Route path="/campaigns" element={<Campaigns />} />
+        <Route path="/campaigns/new" element={<Campaigns />} />
+        <Route path="/campaigns/edit/:id" element={<Campaigns />} />
+        <Route path="/campaigns/report/:id" element={<Campaigns />} />
+
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/users" element={<UserManagement />} />
+      </Route>
+
+      {/* 404 Not Found */}
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+};
+
 const App: React.FC = () => {
   return (
     <AuthProvider>
       <Router>
-        <Routes>
-          <Route path="/login" element={<LoginWrapper />} />
-          <Route path="/*" element={<Layout />} />
-        </Routes>
+        <VersionChecker />
+        <AppRoutes />
       </Router>
     </AuthProvider>
   );
-};
-
-// Wrapper to handle login redirection if already authenticated
-const LoginWrapper: React.FC = () => {
-  const { session } = useAuth();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (session) {
-      navigate('/', { replace: true });
-    }
-  }, [session, navigate]);
-
-  if (session) return null;
-
-  return <Login onLogin={() => navigate('/')} />;
 };
 
 export default App;

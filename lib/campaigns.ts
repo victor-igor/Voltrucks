@@ -14,6 +14,7 @@ export interface AudienceFilter {
 }
 
 export type MessageType = 'text' | 'image' | 'video' | 'template';
+export type CampaignProvider = 'official' | 'unofficial';
 
 export interface Campaign {
     id: string;
@@ -33,12 +34,14 @@ export interface Campaign {
     template_name?: string; // New field for reference
     template_language?: string; // New field for reference
     template_text?: string; // Storing the actual text of the template body
+    provider: CampaignProvider;
 }
 
 export interface WhatsAppTemplate {
     name: string;
     status: string;
     language: string;
+    category: string;
     components: {
         type: 'HEADER' | 'BODY' | 'FOOTER' | 'BUTTONS';
         format?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'DOCUMENT';
@@ -55,7 +58,7 @@ const META_ACCOUNT_ID = '1519441755961650';
 export async function listMessageTemplates(): Promise<WhatsAppTemplate[]> {
     try {
         const response = await fetch(
-            `https://graph.facebook.com/v21.0/${META_ACCOUNT_ID}/message_templates?fields=name,status,language,components&limit=50`,
+            `https://graph.facebook.com/v21.0/${META_ACCOUNT_ID}/message_templates?fields=name,status,language,category,components&limit=50`,
             {
                 headers: {
                     'Authorization': `Bearer ${META_ACCESS_TOKEN}`
@@ -100,6 +103,7 @@ export async function createCampaign(campaign: Omit<Campaign, 'id' | 'created_at
                 template_name: campaign.template_name,
                 template_language: campaign.template_language,
                 template_text: campaign.template_text,
+                provider: campaign.provider || 'official', // Default to official
                 status: campaign.type === 'recurring' ? 'active' : 'pending', // Auto-activate recurring campaigns
                 created_by: user.id
             }

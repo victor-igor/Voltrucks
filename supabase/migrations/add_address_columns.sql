@@ -1,0 +1,7 @@
+ALTER TABLE public.contatos
+ADD COLUMN IF NOT EXISTS cpf text,
+ADD COLUMN IF NOT EXISTS cep text,
+ADD COLUMN IF NOT EXISTS endereco text,
+ADD COLUMN IF NOT EXISTS bairro text,
+ADD COLUMN IF NOT EXISTS cidade text,
+ADD COLUMN IF NOT EXISTS estado text;

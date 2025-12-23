@@ -9,12 +9,13 @@ import {
   Building2,
   User,
   MapPin,
-  Briefcase,
-  Trash2
+  Briefcase
 } from 'lucide-react';
 import { getContact, updateContact, Contact, getTags, createTag, deleteTag, Tag } from '../lib/contacts';
 import { useToast } from '../contexts/ToastContext';
 import { AISummaryDisplay } from './AISummaryDisplay';
+import { TagManager } from './TagManager';
+import { DeleteConfirmationModal } from './DeleteConfirmationModal';
 
 interface ContactDetailsProps {
   onBack?: () => void;
@@ -30,9 +31,10 @@ export const ContactDetails: React.FC<ContactDetailsProps> = ({ onBack }) => {
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState<'info' | 'history'>('info');
-  const [showTagInput, setShowTagInput] = useState(false);
   const [availableTags, setAvailableTags] = useState<Tag[]>([]);
   const [countryCode, setCountryCode] = useState('+55');
+  const [tagToDelete, setTagToDelete] = useState<string | null>(null);
+  const [isDeletingTag, setIsDeletingTag] = useState(false);
 
   const countries = [
     { code: '+55', name: 'Brasil', flag: '🇧🇷', format: '(XX) XXXXX-XXXX' },
@@ -61,8 +63,7 @@ export const ContactDetails: React.FC<ContactDetailsProps> = ({ onBack }) => {
     observacoes: '',
     status: 'Lead',
     origem: '',
-    aceita_whatsapp: true,
-    aceita_email: true
+    receber_campanhas: true
   });
 
   useEffect(() => {
@@ -146,8 +147,7 @@ export const ContactDetails: React.FC<ContactDetailsProps> = ({ onBack }) => {
         observacoes: data.observacoes || '',
         status: data.status || 'Lead',
         origem: data.origem || '',
-        aceita_whatsapp: data.aceita_whatsapp ?? true,
-        aceita_email: data.aceita_email ?? true,
+        receber_campanhas: data.receber_campanhas ?? true,
         tags: data.tags || []
       });
     } catch (error) {
@@ -306,15 +306,35 @@ export const ContactDetails: React.FC<ContactDetailsProps> = ({ onBack }) => {
   };
 
   const handleDeleteSystemTag = async (tagId: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta tag do sistema? Isso não removerá a tag dos contatos que já a possuem.')) return;
+    setTagToDelete(tagId);
+  };
+
+  const confirmDeleteSystemTag = async () => {
+    if (!tagToDelete) return;
 
     try {
-      await deleteTag(tagId);
+      setIsDeletingTag(true);
+      await deleteTag(tagToDelete);
       await loadTags();
       toastSuccess('Tag excluída do sistema!');
     } catch (error) {
       console.error('Error deleting tag:', error);
       toastError('Erro ao excluir tag');
+    } finally {
+      setIsDeletingTag(false);
+      setTagToDelete(null);
+    }
+  };
+
+  const handleCreateNewTag = async (tagName: string, color: string) => {
+    try {
+      await createTag(tagName, color);
+      await loadTags(); // Reload tags
+      await handleAddTag(tagName); // Auto-add to contact
+      toastSuccess('Tag criada!');
+    } catch (error) {
+      console.error('Error creating tag:', error);
+      toastError('Erro ao criar tag');
     }
   };
 
@@ -499,19 +519,18 @@ export const ContactDetails: React.FC<ContactDetailsProps> = ({ onBack }) => {
                   <p className="mt-1.5 text-sm font-medium text-gray-900 dark:text-white">
                     {(() => {
                       if (!contact.telefone) return '-';
-                      const phone = contact.telefone;
-                      // Case 1: Already has country code symbol (e.g. +55)
-                      if (phone.startsWith(countryCode)) {
-                        return phone.replace(countryCode, `${countryCode} `);
+                      const phone = contact.telefone.replace(/\D/g, '');
+
+                      // Check for BRL DDI (55)
+                      if (phone.startsWith('55') && phone.length === 13) {
+                        return `+55 (${phone.substring(2, 4)}) ${phone.substring(4, 9)}-${phone.substring(9)}`;
                       }
-                      // Case 2: Starts with country code digits (e.g. 55...) - avoid duplication
-                      const codeDigits = countryCode.replace(/\D/g, '');
-                      const phoneDigits = phone.replace(/\D/g, '');
-                      if (phoneDigits.startsWith(codeDigits) && phoneDigits.length > codeDigits.length + 4) {
-                        return `${countryCode} ${phoneDigits.substring(codeDigits.length)}`;
+                      if (phone.startsWith('55') && phone.length === 12) {
+                        return `+55 (${phone.substring(2, 4)}) ${phone.substring(4, 8)}-${phone.substring(8)}`;
                       }
-                      // Case 3: No country code present, prepend it
-                      return `${countryCode} ${phone}`;
+
+                      // Just ensure it has + if missing
+                      return contact.telefone.startsWith('+') ? contact.telefone : `+${contact.telefone}`;
                     })()}
                   </p>
                 )}
@@ -626,22 +645,12 @@ export const ContactDetails: React.FC<ContactDetailsProps> = ({ onBack }) => {
                 <div className="flex items-center gap-2">
                   <input
                     type="checkbox"
-                    checked={formData.aceita_whatsapp}
-                    onChange={(e) => handleInputChange('aceita_whatsapp', e.target.checked)}
+                    checked={formData.receber_campanhas}
+                    onChange={(e) => handleInputChange('receber_campanhas', e.target.checked)}
                     disabled={!isEditing}
                     className="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary dark:focus:ring-primary dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
                   />
-                  <label className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Aceita WhatsApp</label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={formData.aceita_email}
-                    onChange={(e) => handleInputChange('aceita_email', e.target.checked)}
-                    disabled={!isEditing}
-                    className="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary dark:focus:ring-primary dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-                  />
-                  <label className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Aceita Email</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Receber Campanhas</label>
                 </div>
               </div>
               <div>
@@ -700,105 +709,32 @@ export const ContactDetails: React.FC<ContactDetailsProps> = ({ onBack }) => {
               </div>
 
               <div className="p-4 bg-white dark:bg-card-dark rounded-lg border border-border-light dark:border-border-dark">
-                <div className="flex justify-between items-center mb-2">
+                <div className="flex items-center gap-2 mb-3">
                   <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Tags</span>
-                  <button
-                    onClick={() => setShowTagInput(!showTagInput)}
-                    className="text-xs text-primary hover:underline"
-                  >
-                    Gerenciar
-                  </button>
                 </div>
 
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {(formData.tags || []).map((tagName, index) => (
-                    <span key={index} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20">
-                      {tagName}
-                      <button
-                        onClick={() => handleRemoveTag(tagName)}
-                        className="hover:text-red-500 transition-colors"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-
-                {showTagInput && (
-                  <div className="relative space-y-3 animate-in fade-in slide-in-from-top-2">
-                    <div className="flex gap-2">
-                      <select
-                        className="flex-1 text-sm px-3 py-1.5 rounded-md border border-border-light dark:border-border-dark bg-gray-50 dark:bg-muted-dark focus:outline-none focus:ring-1 focus:ring-primary"
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val) handleAddTag(val);
-                          e.target.value = '';
-                        }}
-                      >
-                        <option value="">Selecionar tag...</option>
-                        {availableTags.map(tag => (
-                          <option key={tag.id} value={tag.name} disabled={formData.tags?.includes(tag.name)}>
-                            {tag.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="Criar nova tag..."
-                        className="flex-1 text-sm px-3 py-1.5 rounded-md border border-border-light dark:border-border-dark bg-gray-50 dark:bg-muted-dark focus:outline-none focus:ring-1 focus:ring-primary"
-                        onKeyDown={async (e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            const val = e.currentTarget.value.trim();
-                            if (val) {
-                              try {
-                                await createTag(val);
-                                await loadTags(); // Reload tags
-                                handleAddTag(val); // Auto-add to contact
-                                e.currentTarget.value = '';
-                                toastSuccess('Tag criada!');
-                              } catch (err) {
-                                toastError('Erro ao criar tag');
-                              }
-                            }
-                          }
-                        }}
-                      />
-                    </div>
-                    <p className="text-[10px] text-gray-400">Enter para criar nova tag</p>
-
-                    {/* System Tags Management */}
-                    <div className="pt-3 border-t border-border-light dark:border-border-dark">
-                      <p className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-2">Gerenciar Tags do Sistema</p>
-                      <div className="max-h-32 overflow-y-auto space-y-1">
-                        {availableTags.map(tag => (
-                          <div key={tag.id} className="flex items-center justify-between text-xs p-1.5 hover:bg-gray-50 dark:hover:bg-muted-dark/50 rounded transition-colors group">
-                            <span className="text-gray-700 dark:text-gray-300">{tag.name}</span>
-                            <button
-                              onClick={() => handleDeleteSystemTag(tag.id)}
-                              className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-                              title="Excluir tag do sistema"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        ))}
-                        {availableTags.length === 0 && (
-                          <p className="text-xs text-gray-400 italic">Nenhuma tag cadastrada.</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
+                <TagManager
+                  selectedTags={formData.tags || []}
+                  availableTags={availableTags}
+                  onAddTag={handleAddTag}
+                  onRemoveTag={handleRemoveTag}
+                  onCreateTag={handleCreateNewTag}
+                  onDeleteSystemTag={handleDeleteSystemTag}
+                />
               </div>
             </div>
             {/* Action button removed */}
           </div>
         </aside>
       </div>
+      <DeleteConfirmationModal
+        isOpen={!!tagToDelete && !isDeletingTag}
+        onClose={() => setTagToDelete(null)}
+        onConfirm={confirmDeleteSystemTag}
+        title="Excluir Tag do Sistema"
+        message="Tem certeza que deseja excluir esta tag do sistema? Isso não removerá a tag dos contatos que já a possuem, mas ela não aparecerá mais como opção para novos contatos."
+        isDeleting={isDeletingTag}
+      />
     </div>
   );
 };

@@ -13,6 +13,7 @@ export const ContactsList: React.FC<ContactsListProps> = ({ onEdit }) => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState('Todos');
   const itemsPerPage = 10;
 
   const { error: toastError } = useToast();
@@ -51,11 +52,23 @@ export const ContactsList: React.FC<ContactsListProps> = ({ onEdit }) => {
   };
 
   // Filter contacts first
-  const filteredContacts = contacts.filter(contact =>
-    contact.nome_completo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (contact.telefone && contact.telefone.includes(searchTerm)) ||
-    (contact.empresa && contact.empresa.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredContacts = contacts.filter(contact => {
+    // Search filter
+    const matchesSearch = contact.nome_completo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (contact.telefone && contact.telefone.includes(searchTerm)) ||
+      (contact.empresa && contact.empresa.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    // Status filter
+    let matchesStatus = true;
+    if (statusFilter !== 'Todos') {
+      const s = contact.status?.toLowerCase() || 'novo';
+      if (statusFilter === 'Clientes') matchesStatus = s === 'cliente';
+      else if (statusFilter === 'Leads') matchesStatus = s === 'lead' || s === 'novo';
+      else if (statusFilter === 'Inativos') matchesStatus = s === 'inativo';
+    }
+
+    return matchesSearch && matchesStatus;
+  });
 
   // Then paginate
   const totalPages = Math.ceil(filteredContacts.length / itemsPerPage);
@@ -111,18 +124,21 @@ export const ContactsList: React.FC<ContactsListProps> = ({ onEdit }) => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <button className="flex-1 sm:flex-none px-4 py-2.5 rounded-lg bg-primary/10 text-primary text-sm font-bold whitespace-nowrap hover:bg-primary/20 transition-colors text-center">
-            Todos
-          </button>
-          <button className="flex-1 sm:flex-none px-4 py-2.5 rounded-lg bg-white dark:bg-card-dark text-gray-600 dark:text-gray-300 border border-border-light dark:border-border-dark hover:bg-gray-50 dark:hover:bg-muted-dark text-sm font-medium transition-colors whitespace-nowrap shadow-sm text-center">
-            Clientes
-          </button>
-          <button className="flex-1 sm:flex-none px-4 py-2.5 rounded-lg bg-white dark:bg-card-dark text-gray-600 dark:text-gray-300 border border-border-light dark:border-border-dark hover:bg-gray-50 dark:hover:bg-muted-dark text-sm font-medium transition-colors whitespace-nowrap shadow-sm text-center">
-            Leads
-          </button>
-          <button className="flex-1 sm:flex-none px-4 py-2.5 rounded-lg bg-white dark:bg-card-dark text-gray-600 dark:text-gray-300 border border-border-light dark:border-border-dark hover:bg-gray-50 dark:hover:bg-muted-dark text-sm font-medium transition-colors whitespace-nowrap shadow-sm text-center">
-            Inativos
-          </button>
+          {['Todos', 'Clientes', 'Leads', 'Inativos'].map((filter) => (
+            <button
+              key={filter}
+              onClick={() => {
+                setStatusFilter(filter);
+                setCurrentPage(1);
+              }}
+              className={`flex-1 sm:flex-none px-4 py-2.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap shadow-sm text-center ${statusFilter === filter
+                ? 'bg-primary/10 text-primary font-bold border border-primary/20'
+                : 'bg-white dark:bg-card-dark text-gray-600 dark:text-gray-300 border border-border-light dark:border-border-dark hover:bg-gray-50 dark:hover:bg-muted-dark'
+                }`}
+            >
+              {filter}
+            </button>
+          ))}
         </div>
       </div>
 

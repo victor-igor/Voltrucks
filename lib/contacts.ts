@@ -13,8 +13,7 @@ export interface Contact {
     bairro?: string;
     cidade?: string;
     estado?: string;
-    aceita_whatsapp?: boolean;
-    aceita_email?: boolean;
+    receber_campanhas?: boolean;
     status: string;
     lead_score?: number;
     funil_status?: string;
